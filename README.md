@@ -8,7 +8,7 @@ This repository contains the source code for "A Recurrent YOLOv8-Based Framework
 You can read the full paper on: <br/>
 [Frontiers in Neuroscience - ReYOLOv8 paper](https://doi.org/10.3389/fnins.2024.1477979) <br/>
 
-To check-out the original YOLOv8 repo, from Utralytics, you can check: <br/>
+To check out the original YOLOv8 repo, from Utralytics, you can check: <br/>
 [Ultralytics' original repo](https://github.com/ultralytics/ultralytics) <br/>
 
 # Setting up the environment 
@@ -20,7 +20,7 @@ python -m pip install opencv-python tqdm==4.66.2 pandas==2.2.2 numpy==1.22.4 psu
 ```
 # Downloading the necessary data
 
-You can donwload the pretrained weights used in this work here:
+You can download the pretrained weights used in this work here:
 
 [pretrained weights](https://drive.google.com/drive/folders/1UHIShRPFNVq1hDIUDlWC2gCz-RAbidr7?usp=drive_link)
 
@@ -56,9 +56,9 @@ To evaluate the data format statistics
 The folder **test_timing** has our experiments' "csv" files. 
 
 To generate the csv files on your setup, you can first download the sequence used for us through this link:
-[Sequence for data format evaluation](https://drive.google.com/file/d/1Tuey6YnQsouGtM1bFNKk2WCRAGrsh1xM/view?usp=sharing)
+[Sequence for data format evaluation](https://drive.google.com/file/d/1HYk3kmB0zg7I6s8-ZZGu1Mf_yRrN7DGh/view?usp=sharing)
 
-Then, you can generate the csv files running the following code snippet. 
+Then, you can generate the csv files by running the following code snippet. 
 
 ```
 python EventEncodingProfilerRun.py --input_file $DAT --output $OUTPUT_FOLDER --format $FMT
@@ -97,7 +97,7 @@ where:
 **CLIP_LENGTH**: Length of the clips used for training <br />
 **CLIP_STRIDE**: Distance between different clips. If equal to CLIP_LENGTH, clips will not present overlap.
 
-Other parameters such as the loss coefficients, learning rate, and weight decay can be modified in the **default.yaml** files.
+Other parameters, such as the loss coefficients, learning rate, and weight decay, can be modified in the **default.yaml** files.
 
 To accelerate the training, we adopted some tricks:  <br />
 **1-** We validated only at each 10 epochs <br />
@@ -164,14 +164,14 @@ The raw datasets used in this work can be found on the following links:
 #python singleShot_eventDataHandler_pedro.py --timeWindow ${T} --dataset pedro --category "test" --source ${RAW_DATASET_FOLDER} --destination ${CONVERTED_DATASET_FOLDER} --method ${FMT} --bins ${TBIN}
 ```
 
-**T**: time-window for creating the encodings. We used 50 for GEN1 and 40 for PeDRo. <br />
+**T**: time window for creating the encodings. We used 50 for GEN1 and 40 for PeDRo. <br />
 **CONVERTED_DATASET_FOLDER**: destination folder <br />
 **RAW_DATASET_FOLDER**: folder where the raw dataset is stored <br />
 **FMT**: vtei, mdes, voxel_grid, or shist. <br />
 **TBIN**: number of channels of the encoding. For **SHIST and VOXEL_GRIDs**, the final number of channels will be **2TBIN**
 
 
-Remarks: **Do not use Random Polariy Suppression if you choose SHIST or VOXEL_GRID as methods**
+Remarks: **Do not use Random Polarity Suppression if you choose SHIST or VOXEL_GRID as methods**
 # Code Acknowledgements
 
 - https://github.com/ultralytics/ultralytics
