@@ -22,11 +22,11 @@ python -m pip install opencv-python tqdm==4.66.2 pandas==2.2.2 numpy==1.22.4 psu
 
 You can download the pretrained weights used in this work here:
 
-[pretrained weights](https://drive.google.com/drive/folders/1UHIShRPFNVq1hDIUDlWC2gCz-RAbidr7?usp=drive_link)
+[pretrained weights](https://drive.google.com/file/d/1Ev2S8ortd4snik8VVZXFxVzwEBaEyueu/view?usp=sharing)
 
 Meanwhile, the preprocessed datasets can be found here:
 
-[preprocessed datasets](https://drive.google.com/drive/folders/1mmzEw8Jkcz9BFocw5OqFdCLb_H8t-ue5?usp=drive_link)
+[preprocessed datasets](https://drive.google.com/file/d/1dz5Vfv41xcgRYeYNTpyGjD_VwUa5Koe9/view?usp=sharing)
 # Evaluate the results of the paper
 
 First of all, you need to open the "yaml" file to the corresponding dataset you want to test and modify the paths to the location you are using.
@@ -56,7 +56,7 @@ To evaluate the data format statistics
 The folder **test_timing** has our experiments' "csv" files. 
 
 To generate the csv files on your setup, you can first download the sequence used for us through this link:
-[Sequence for data format evaluation](https://drive.google.com/file/d/1HYk3kmB0zg7I6s8-ZZGu1Mf_yRrN7DGh/view?usp=sharing)
+[Sequence for data format evaluation](https://drive.google.com/file/d/1KutCUZxwzcSSili3rjEByz8R8EQNsWh7/view?usp=sharing)
 
 Then, you can generate the csv files by running the following code snippet. 
 
