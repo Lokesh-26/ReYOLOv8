@@ -29,7 +29,7 @@ Meanwhile, the preprocessed datasets can be found here:
 [preprocessed datasets](https://drive.google.com/file/d/1dz5Vfv41xcgRYeYNTpyGjD_VwUa5Koe9/view?usp=sharing)
 # Evaluate the results of the paper
 
-First of all, you need to open the "yaml" file to the corresponding dataset you want to test and modify the paths to the location you are using.
+First of all, you need to open the "yaml" file for the corresponding dataset you want to test and modify the paths to the location you are using.
 Then, you can run:
 
 ```
@@ -41,7 +41,7 @@ Example: <br />
 **WEIGHTS**: weights/reyolov8s_gen1_rps <br />
 **SEQ**: number of sequences you want to see the predictions, default is 3 
 
-The speed statistics in this validation mode are given according the full sequences. To check the speed to perform inference tensor by tensor, we run:
+The speed statistics in this validation mode are given according to the full sequences. To check the speed to perform inference tensor by tensor, we run:
 
 ```
  python val.py --data ${DATASET}.yaml --model ${WEIGHTS}.pt --channels 5 --split ${SPLIT} --speed
