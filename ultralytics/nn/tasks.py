@@ -535,17 +535,26 @@ def torch_safe_load(weight):
         The loaded PyTorch model.
     """
 
+    # Allowlist Ultralytics custom model classes used in older checkpoints
     try:
-        return torch.load(weight, map_location='cpu'), weight  # load
+        from ultralytics.nn.tasks import DetectionModel2
+        torch.serialization.add_safe_globals([DetectionModel2])
+    except Exception:
+        pass
+
+    try:
+        return torch.load(weight, map_location='cpu', weights_only=False), weight
     except ModuleNotFoundError as e:
-        if e.name == 'omegaconf':  # e.name is missing module name
-            LOGGER.warning(f'WARNING ⚠️ {weight} requires {e.name}, which is not in ultralytics requirements.'
-                           f'\nAutoInstall will run now for {e.name} but this feature will be removed in the future.'
-                           f'\nRecommend fixes are to train a new model using updated ultralytics package or to '
-                           f'download updated models from https://github.com/ultralytics/assets/releases/tag/v0.0.0')
+        if e.name == 'omegaconf':
+            LOGGER.warning(
+                f'WARNING ⚠️ {weight} requires {e.name}, which is not in ultralytics requirements.'
+                f'\nAutoInstall will run now for {e.name} but this feature will be removed in the future.'
+                f'\nRecommend fixes are to train a new model using updated ultralytics package or to '
+                f'download updated models from https://github.com/ultralytics/assets/releases/tag/v0.0.0'
+            )
         if e.name != 'models':
-            check_requirements(e.name)  # install missing module
-        return torch.load(weight, map_location='cpu'), weight  # load
+            check_requirements(e.name)
+        return torch.load(weight, map_location='cpu', weights_only=False), weight
 
 
 def attempt_load_weights(weights, device=None, inplace=True, fuse=False):

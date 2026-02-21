@@ -36,13 +36,22 @@ class EventVideoDetectionDataset(Dataset):
         self.samples = []
  
         self.video_path_h5 = glob.glob(os.path.join(self.video_path,'*.h5'))           
-        self.label_files = sorted(glob.glob(os.path.join(self.video_path.replace('images','labels'),'*.npy')))
+        self.label_files = sorted(glob.glob(os.path.join(self.video_path.replace('images','labels'),'*.npz')))
         
         # Load the information for each video and process it into clips
         begin = 0
 
         for i, f in enumerate(self.label_files):
-            labels = np.load(f, allow_pickle = True)
+            labels_npz = np.load(f)
+            counts = labels_npz['counts']
+            boxes = labels_npz['boxes']
+            labels_list = []
+            off = 0
+            for c in counts:
+                c = int(c)
+                labels_list.append(boxes[off:off+c] if c > 0 else np.zeros((0,5), dtype=np.float32))
+                off += c
+            labels = np.array(labels_list, dtype=object)
             self.sequence_length.append(len(labels))
             length = len(labels)
              
