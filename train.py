@@ -82,6 +82,7 @@ def parse_opt(known=False):
     parser.add_argument('--half', action='store_true', help='use FP16 format')
     parser.add_argument('--plots', action='store_false', help='plot results')
     parser.add_argument('--pretrained', action='store_true', help='use pretrained model')
+    parser.add_argument('--patience', type=int, default=50, help='EarlyStopping patience')
     # Hyperparameters 
     parser.add_argument('--hyp', type=str, default= ROOT / 'ultralytics/yolo/cfg/default.yaml', help='hyperparameters path')
     parser.add_argument('--optimizer', type=str, choices=['SGD', 'Adam', 'AdamW'], default='SGD', help='optimizer')
