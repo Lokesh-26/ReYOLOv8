@@ -276,7 +276,6 @@ def plot_images(images,
                 annotator.fromarray(im)
     annotator.im.save(fname)  # save
 
-@threaded
 def plot_event_images(images,
                 batch_idx,
                 cls,
@@ -284,14 +283,23 @@ def plot_event_images(images,
                 masks=np.zeros(0, dtype=np.uint8),
                 paths=None,
                 fname='images.jpg',
-                names=None):
+                names=None,
+                conf_thres=0.01,
+                top1=False):
      # Plot image grid with labels
 
      if isinstance(images, torch.Tensor):
         images = images.cpu().float().numpy()
-        images = np.sum(images,axis = 1)
-        images.resize((images.shape[0],1,images.shape[1],images.shape[2]))
-        images = 127.5*images + 127.5
+        images = np.sum(images, axis=1)
+        images = images.reshape((images.shape[0], 1, images.shape[1], images.shape[2]))
+        # Normalize to [0, 255] range properly
+        img_min = images.min()
+        img_max = images.max()
+        if img_max - img_min > 1e-5:
+            images = (images - img_min) / (img_max - img_min) * 255.0
+        else:
+            images = np.full_like(images, 127.5)
+        images = np.clip(images, 0, 255)
      if isinstance(cls, torch.Tensor):
          cls = cls.cpu().numpy()
      if isinstance(bboxes, torch.Tensor):
@@ -301,14 +309,23 @@ def plot_event_images(images,
      if isinstance(batch_idx, torch.Tensor):
         batch_idx = batch_idx.cpu().numpy()
 
+     cls = np.asarray(cls)
+     bboxes = np.asarray(bboxes)
+     batch_idx = np.asarray(batch_idx)
+
+     if cls.ndim == 0:
+         cls = cls.reshape(1)
+     if batch_idx.ndim == 0:
+         batch_idx = batch_idx.reshape(1)
+     if bboxes.ndim == 1:
+         bboxes = bboxes.reshape(1, -1)
+
      max_size = 1920  # max image size
      max_subplots = 16  # max image subplots, i.e. 4x4
 
      bs, _, h, w = images.shape  # batch size, _, height, width
      bs = min(bs, max_subplots)  # limit plot images
      ns = np.ceil(bs ** 0.5)  # number of subplots (square)
-     #if np.max(images[0]) <= 1:
-     #    images *= 255  # de-normalise (optional)
 
      # Build Image
      mosaic = np.full((int(ns * h), int(ns * w), 3), 255, dtype=np.uint8)  # init
@@ -316,8 +333,9 @@ def plot_event_images(images,
         if i == max_subplots:  # if last batch has fewer images than we expect
             break
         x, y = int(w * (i // ns)), int(h * (i % ns))  # block origin
-        im = im.transpose(1, 2, 0)
-        mosaic[y:y + h, x:x + w, :] = im
+        im = im.transpose(1, 2, 0)  # (1, H, W) -> (H, W, 1)
+        im_rgb = np.repeat(im, 3, axis=2).astype(np.uint8)  # (H, W, 1) -> (H, W, 3)
+        mosaic[y:y + h, x:x + w, :] = im_rgb
 
      # Resize (optional)
      scale = max_size / ns / max(h, w)
@@ -334,7 +352,7 @@ def plot_event_images(images,
         annotator.rectangle([x, y, x + w, y + h], None, (255, 255, 255), width=2)  # borders
         if paths:
             annotator.text((x + 5, y + 5 + h), text=Path(paths[i]).name[:40], txt_color=(220, 220, 220))  # filenames
-        if len(cls) > 0:
+        if cls.size > 0:
             idx = batch_idx == i
 
             boxes = xywh2xyxy(bboxes[idx, :4]).T
@@ -350,15 +368,23 @@ def plot_event_images(images,
                     boxes *= scale
             boxes[[0, 2]] += x
             boxes[[1, 3]] += y
+
+            if top1 and not labels and conf is not None and conf.size:
+                best = int(np.argmax(conf))
+                boxes = boxes[:, [best]]
+                classes = classes[[best]]
+                conf = conf[[best]]
+
             for j, box in enumerate(boxes.T.tolist()):
                 c = classes[j]
                 color = colors(c)
                 c = names[c] if names else c
-                if labels or conf[j] > 0.25:  # 0.25 conf thresh
-                    label = f'{c}' if labels else f'{c} {conf[j]:.1f}'
+                if labels or conf[j] > conf_thres:
+                    label = f'{c}' if labels else f'{c} {conf[j]:.3f}'
                     annotator.box_label(box, label, color=color)
 
-
+     # Ensure parent directory exists before saving
+     Path(fname).parent.mkdir(parents=True, exist_ok=True)
      annotator.im.save(fname)  # save
 
 def plot_results(file='path/to/results.csv', dir='', segment=False):
