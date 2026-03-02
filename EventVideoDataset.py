@@ -110,25 +110,20 @@ class EventVideoDetectionDataset(Dataset):
         """
         if self.load_type == "train" or self.mode == "batched":
 
-          self.num_clips = len(video) // self.clip_stride
-          required_length = (self.num_clips-1)*(self.clip_stride) + self.clip_length
-          indices = np.tile(np.arange(0, required_length, 1, dtype='int32'),1)
-          # Starting index of each clip
-          clip_starts = np.arange(0, len(indices), self.clip_stride).astype('int32')[:self.num_clips]
-        
-                    
-        
-          if len(video) > required_length:
-          
-            clip_starts=np.append(clip_starts,len(video) - self.clip_length)
-            self.num_clips += 1
+          max_start = len(video) - self.clip_length
+          if max_start >= 0:
+             clip_starts = np.arange(0, max_start + 1, self.clip_stride).astype('int32')
+          else:
+             clip_starts = np.array([], dtype='int32')
+
+          self.num_clips = len(clip_starts)
+
           if self.sequence_last_clip == []:
              self.sequence_last_clip.append(self.num_clips - 1)
           else:
 
              self.sequence_last_clip.append(self.sequence_last_clip[len(self.sequence_last_clip) - 1] + self.num_clips)
-            
-          #print(clip_starts)
+
           final_video = [video[_idx:_idx+self.clip_length] for _idx in clip_starts]
         else:
              self.num_clips = 1
