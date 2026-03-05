@@ -37,7 +37,13 @@ class EventVideoDetectionDataset(Dataset):
  
         self.video_path_h5 = glob.glob(os.path.join(self.video_path,'*.h5'))           
         self.label_files = sorted(glob.glob(os.path.join(self.video_path.replace('images','labels'),'*.npy')))
-        
+
+        # Read H5 length once so we can discard clips with out-of-range indices.
+        self.h5_len = None
+        if self.video_path_h5:
+            with h5py.File(self.video_path_h5[0], 'r') as f:
+                self.h5_len = f['1mp'].shape[0]
+
         # Load the information for each video and process it into clips
         begin = 0
 
@@ -60,8 +66,14 @@ class EventVideoDetectionDataset(Dataset):
             
             # Each clip is a list of dictionaries per frame containing information
             # Example info: object bbox annotations, object classes, frame img path
-            for clip in clips:    
-        
+            for clip in clips:
+                # Skip any clip whose last frame index exceeds the H5 dataset length.
+                # This prevents IndexError in __getitem__ while keeping clip-length intact.
+                if self.h5_len is not None and clip:
+                    max_frame = max(entry["frame"] for entry in clip)
+                    if max_frame >= self.h5_len:
+                        continue
+
                 self.samples.append(clip)
              
     def pad_labels(self, labels, length):
@@ -78,8 +90,8 @@ class EventVideoDetectionDataset(Dataset):
            
            
 
-           return np.array(labels)    
-           
+           return np.array(labels, dtype=object)
+
         else:
              return labels  
     
@@ -127,16 +139,15 @@ class EventVideoDetectionDataset(Dataset):
           final_video = [video[_idx:_idx+self.clip_length] for _idx in clip_starts]
         else:
              self.num_clips = 1
-             self.clip_stride = 1
-             self.clip_length = len(video)
- 
+             clip_len = len(video)  # local – don't overwrite self.clip_length
+
              if self.sequence_last_clip == []:
               self.sequence_last_clip.append(self.num_clips - 1)
              else:
 
               self.sequence_last_clip.append(self.sequence_last_clip[len(self.sequence_last_clip) - 1] + self.num_clips)
-             final_video = [video[0:self.clip_length]]
-        
+             final_video = [video[0:clip_len]]
+
         return final_video
    
     def __len__(self):
@@ -152,6 +163,14 @@ class EventVideoDetectionDataset(Dataset):
         vid_length = len(vid_info)
 
         frame = [vid_info[idx2]['frame'] for idx2 in range(len(vid_info))]
+
+        # Defensive guard: clamp frame indices to valid H5 range.
+        # This should rarely trigger because invalid clips are already
+        # skipped in _getClips(), but it prevents IndexError if something
+        # slips through (e.g. label/H5 length mismatch).
+        h5_len = self.data_file['1mp'].shape[0]
+        frame = [min(s, h5_len - 1) for s in frame]
+
         classes = [vid_info[idx3]['labels'][:,0] for idx3 in range(len(vid_info))]
         boxes = [vid_info[idx4]['labels'][:,1:] for idx4 in range(len(vid_info))]
         frame_ind = [[idx5]*len(vid_info[idx5]['labels']) for idx5 in range(len(vid_info))] 
@@ -318,6 +337,8 @@ class EventVideoDetectionDataset(Dataset):
         new_batch['batch_idx'] = torch.cat(new_batch['batch_idx'], 0)
         #print("collate time:", time.time()-start_collate)
         return new_batch
+
+
 
 
 
