@@ -105,49 +105,50 @@ def parse_opt(known=False):
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
-args = parse_opt()
-# Open hyparparameter files
-overrides = yaml.safe_load(Path(args.hyp).read_text())
-# append arg_parse items to the overrides dictionary
+if __name__ == '__main__':
+    args = parse_opt()
+    # Open hyparparameter files
+    overrides = yaml.safe_load(Path(args.hyp).read_text())
+    # append arg_parse items to the overrides dictionary
 
-cfg = "default.yaml"
-overrides["save"] = args.save
+    cfg = "default.yaml"
+    overrides["save"] = args.save
 
-overrides["save_period"] = args.save_period
-overrides["model"] = args.model
-overrides["seed"] = args.seed
-overrides["data"] = args.data
-overrides["epochs"] = args.epochs
-overrides["batch"] = args.batch
-overrides["imgsz"] = args.imgsz
-overrides["rect"] = args.rect
-overrides["resume"] = args.resume
-overrides["cache"] = args.cache
-overrides["device"] = args.device
-overrides["workers"] = args.workers
-overrides["project"] = args.project
-overrides["name"] = args.name
-overrides["cos_lr"] = args.cos_lr
-overrides["half"] = args.half
-overrides["plots"] = args.plots
-overrides["pretrained"] = args.pretrained
-overrides["nbs"] = args.nbs
-overrides["optimizer"] = args.optimizer
+    overrides["save_period"] = args.save_period
+    overrides["model"] = args.model
+    overrides["seed"] = args.seed
+    overrides["data"] = args.data
+    overrides["epochs"] = args.epochs
+    overrides["batch"] = args.batch
+    overrides["imgsz"] = args.imgsz
+    overrides["rect"] = args.rect
+    overrides["resume"] = args.resume
+    overrides["cache"] = args.cache
+    overrides["device"] = args.device
+    overrides["workers"] = args.workers
+    overrides["project"] = args.project
+    overrides["name"] = args.name
+    overrides["cos_lr"] = args.cos_lr
+    overrides["half"] = args.half
+    overrides["plots"] = args.plots
+    overrides["pretrained"] = args.pretrained
+    overrides["nbs"] = args.nbs
+    overrides["optimizer"] = args.optimizer
 
+    overrides["clip_length"] = args.clip_length
+    overrides["clip_stride"] = args.clip_stride
+    overrides["channels"] = args.channels
+    overrides["patience"] = args.patience
 
-overrides["clip_length"] = args.clip_length
-overrides["clip_stride"] = args.clip_length
-overrides["channels"] = args.channels
+    overrides["val_epoch"] = args.val_epoch
 
-overrides["val_epoch"] = args.val_epoch
-
-overrides["flip"] = args.flip
-overrides["invert"] = args.invert
-overrides["suppress"] = args.suppress
-overrides["positive"] = args.positive
-overrides["zoom_out"] = args.zoom_out
-overrides["max_zoom_out_factor"] = args.max_zoom_out_factor
-overrides["min_zoom_out_factor"] = args.min_zoom_out_factor
+    overrides["flip"] = args.flip
+    overrides["invert"] = args.invert
+    overrides["suppress"] = args.suppress
+    overrides["positive"] = args.positive
+    overrides["zoom_out"] = args.zoom_out
+    overrides["max_zoom_out_factor"] = args.max_zoom_out_factor
+    overrides["min_zoom_out_factor"] = args.min_zoom_out_factor
 
 
 # BaseTrainer python usage
@@ -172,10 +173,10 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
         init_seeds(self.args.seed + 1 + RANK, deterministic=self.args.deterministic)
         
  
-        self.video_config = {"clip_length": args.clip_length, "clip_stride": args.clip_stride, "channels": args.channels}
-        self.aug_params = {"flip": args.flip, "invert": args.invert, "suppress": args.suppress, "positive": args.positive, "zoom_out": args.zoom_out, "max_zoom_out_factor": args.max_zoom_out_factor, 
-        "min_zoom_out_factor": args.min_zoom_out_factor}
-        
+        self.video_config = {"clip_length": self.args.clip_length, "clip_stride": self.args.clip_stride, "channels": self.args.channels}
+        self.aug_params = {"flip": self.args.flip, "invert": self.args.invert, "suppress": self.args.suppress, "positive": self.args.positive, "zoom_out": self.args.zoom_out, "max_zoom_out_factor": self.args.max_zoom_out_factor,
+        "min_zoom_out_factor": self.args.min_zoom_out_factor}
+
         # Dirs
         project = self.args.project or Path(SETTINGS['runs_dir']) / self.args.task
         name = self.args.name or f'{self.args.mode}'
@@ -236,8 +237,8 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
         self.callbacks = defaultdict(list, callbacks.default_callbacks)  # add callbacks
         if RANK in {0, -1}:
             callbacks.add_integration_callbacks(self)
-            wandb.init(project =  self.args.project, name = self.args.name, config=
-        overrides)
+            wandb_project = str(self.args.project).replace('/', '_').replace('\\', '_')
+            wandb.init(project=wandb_project, name=str(self.args.name), config=overrides)
         
 
 
@@ -650,5 +651,7 @@ class LossVideo:
         else: 
            return loss.sum() * batch_size, loss.detach()
 
-trainer = EventVideoYOLOv8DetectionTrainer(overrides=overrides)
-trainer.train()
+
+if __name__ == '__main__':
+    trainer = EventVideoYOLOv8DetectionTrainer(overrides=overrides)
+    trainer.train()
