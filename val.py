@@ -40,9 +40,8 @@ class EventVideoDetectionValidator(BaseValidator):
         self.imgsz = self.args.imgsz
         self.dtype = torch.cuda.HalfTensor if self.args.half else torch.cuda.FloatTensor
         if self.args.plots:
-          if not os.path.exists(os.path.join(self.save_dir, "preds")):
-            os.mkdir(os.path.join(self.save_dir, "labels"))
-            os.mkdir(os.path.join(self.save_dir, "preds"))
+          os.makedirs(os.path.join(self.save_dir, "labels"), exist_ok=True)
+          os.makedirs(os.path.join(self.save_dir, "preds"), exist_ok=True)
         if not hasattr(args,"show_sequences"):
            self.args.show_sequences = -1
     @smart_inference_mode()
@@ -309,22 +308,28 @@ class EventVideoDetectionValidator(BaseValidator):
         return build_video_val_standalone_dataloader(self.args, self.video_config, batch_size,dataset_path,rank=rank, mode = load, speed = speed, zero_hidden = zero_hidden)[0]
 
     def plot_val_samples(self, batch_, batch, ni,si, seq_mask):
-
-        plot_event_images(batch_,
-                    batch['batch_idx'][seq_mask],
-                    batch['cls'][seq_mask].squeeze(-1),
-                    batch['bboxes'][seq_mask],
-                    paths=None,
-                    fname=self.save_dir / f'labels/val_batch{ni}_seq{si}_labels.jpg',
-                    names=self.names)
+        try:
+            plot_event_images(batch_,
+                        batch['batch_idx'][seq_mask],
+                        batch['cls'][seq_mask].squeeze(-1),
+                        batch['bboxes'][seq_mask],
+                        paths=None,
+                        fname=self.save_dir / f'labels/val_batch{ni}_seq{si}_labels.jpg',
+                        names=self.names)
+        except Exception as e:
+            LOGGER.warning(f'WARNING: plot_val_samples failed for batch {ni}, seq {si}: {e}')
 
     def plot_predictions(self, batch_, batch, preds, ni,si):
-
-        plot_event_images(batch_,
-                    *output_to_target(preds, max_det=15),
-                    paths=None,
-                    fname=self.save_dir / f'preds/val_batch{ni}_seq{si}_pred.jpg',
-                    names=self.names)  # pred
+        try:
+            plot_event_images(batch_,
+                        *output_to_target(preds, max_det=15),
+                        paths=None,
+                        fname=self.save_dir / f'preds/val_batch{ni}_seq{si}_pred.jpg',
+                        names=self.names,
+                        conf_thres=0.10,
+                        top1=True)  # plot only the top-1 confident prediction
+        except Exception as e:
+            LOGGER.warning(f'WARNING: plot_predictions failed for batch {ni}, seq {si}: {e}')
 
     def pred_to_json(self, predn, filename):
         stem = Path(filename).stem
