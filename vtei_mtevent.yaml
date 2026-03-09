@@ -1,8 +1,0 @@
-path: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin/images
-train: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin/images/train
-val: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin/images/val
-test: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin/images/test
-
-names:
-  0: human
-

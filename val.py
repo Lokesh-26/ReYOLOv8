@@ -198,12 +198,13 @@ class EventVideoDetectionValidator(BaseValidator):
         
         
         preds = ops.non_max_suppression(preds,
-                                        self.args.conf, #self.args.conf
-                                        self.args.iou,  #self.args.iou
+                                        self.args.conf,
+                                        self.args.iou,
                                         labels=self.lb,
                                         multi_label=True,
                                         agnostic=False,
-                                        max_det=self.args.max_det)
+                                        max_det=self.args.max_det,
+                                        classes=self.args.classes)
         return preds
 
     def update_metrics(self, preds, batch_,batch, sequence_mask, T):
@@ -213,6 +214,12 @@ class EventVideoDetectionValidator(BaseValidator):
             cls = batch['cls'][sequence_mask][idx]
             cls = cls.view(cls.shape[0],1).to(self.device)
             bbox = batch['bboxes'][sequence_mask][idx].to(self.device)
+            # filter GT to specified classes if --classes is set
+            if self.args.classes is not None:
+                class_filter = torch.tensor(self.args.classes, device=self.device)
+                keep = (cls.squeeze(-1).unsqueeze(1) == class_filter).any(1)
+                cls = cls[keep]
+                bbox = bbox[keep]
             nl, npr = cls.shape[0], pred.shape[0]  # number of labels, predictions
 
             correct_bboxes = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
@@ -413,13 +420,14 @@ def val(cfg=DEFAULT_CFG,use_python=False):
     parser.add_argument('--clip_length', default = 1, type=int)
     parser.add_argument('--clip_stride', default = 1, type=int)
     parser.add_argument('--show_sequences', default = 3, type=int)
+    parser.add_argument('--classes', nargs='+', type=int, default=None, help='filter by class index, e.g. --classes 16 or --classes 0 1 2')
     
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
 
  args = parse_opt()
- args.project = args.project / args.split
+ args.project = Path(args.project) / args.split
 
  validator = EventVideoDetectionValidator(args=args)
  validator(model=args.model)
