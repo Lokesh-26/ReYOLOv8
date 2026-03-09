@@ -98,9 +98,9 @@ def parse_opt(known=False):
     parser.add_argument('--positive',  type=float, default=0.0)  
     parser.add_argument('--zoom_out',  type=float, default=0.0)  
     parser.add_argument('--max_zoom_out_factor',  type=float, default=2.0)  
-    parser.add_argument('--min_zoom_out_factor',  type=float, default=1.0)  
-
-
+    parser.add_argument('--min_zoom_out_factor',  type=float, default=1.0)
+    parser.add_argument('--freeze', type=int, default=0,
+                        help='Freeze first N backbone layers (0=none). Backbone layers: 0-13, head: 14+.')
 
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
@@ -149,6 +149,7 @@ if __name__ == '__main__':
     overrides["zoom_out"] = args.zoom_out
     overrides["max_zoom_out_factor"] = args.max_zoom_out_factor
     overrides["min_zoom_out_factor"] = args.min_zoom_out_factor
+    overrides["freeze"] = args.freeze
 
 
 # BaseTrainer python usage
@@ -237,8 +238,13 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
         self.callbacks = defaultdict(list, callbacks.default_callbacks)  # add callbacks
         if RANK in {0, -1}:
             callbacks.add_integration_callbacks(self)
-            wandb_project = str(self.args.project).replace('/', '_').replace('\\', '_')
-            wandb.init(project=wandb_project, name=str(self.args.name), config=overrides)
+            if os.environ.get('WANDB_MODE', '').lower() != 'disabled':
+                try:
+                    wandb_project = str(self.args.project).replace('/', '_').replace('\\', '_')
+                    wandb.init(project=wandb_project, name=str(self.args.name), config=overrides)
+                except Exception as _wandb_e:
+                    LOGGER.warning(f'wandb init failed (continuing without): {_wandb_e}')
+                    os.environ['WANDB_MODE'] = 'disabled'
         
 
 
@@ -334,6 +340,18 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
         ckpt = self.setup_model()
         self.model = self.model.to(self.device)
         self.set_model_attributes()
+
+        # Freeze first N backbone layers to preserve pretrained features
+        freeze_n = getattr(self.args, 'freeze', 0)
+        if freeze_n and freeze_n > 0:
+            freeze_prefixes = tuple(f'model.{i}.' for i in range(int(freeze_n)))
+            frozen = 0
+            for name, param in self.model.named_parameters():
+                if name.startswith(freeze_prefixes):
+                    param.requires_grad = False
+                    frozen += 1
+            LOGGER.info(f'Froze {frozen} parameters in layers 0-{int(freeze_n)-1}')
+
         if world_size > 1:
             #self.model = DDP(self.model, device_ids=[rank], find_unused_parameters = True)
             self.model = DDP(self.model, device_ids=[rank], broadcast_buffers=False)
@@ -397,7 +415,11 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
                     self.metrics = self.validator(model=f)
                     self.metrics.pop('fitness', None)
                     self.run_callbacks('on_fit_epoch_end')
-                    wandb.log(self.metrics)
+                    if os.environ.get('WANDB_MODE', '').lower() != 'disabled':
+                        try:
+                            wandb.log(self.metrics)
+                        except Exception:
+                            pass
 
 
     def _do_train(self, rank=-1, world_size=1):
