@@ -329,7 +329,7 @@ def main():
         # Extract a stable numeric scene id if present
         base = os.path.basename(sd.rstrip("/"))
         scene_pairs.append((base, sd))
-    scene_pairs.sort(key=lambda x: x[0])  # same order as glob(sorted)
+    scene_pairs.sort(key=lambda x: int(re.search(r'(\d+)', x[0]).group(1)))  # numeric sort matches zero-padded .npy glob order
 
     for base, scene_dir in scene_pairs:
         bag_path = os.path.join(scene_dir, args.bag_name)
