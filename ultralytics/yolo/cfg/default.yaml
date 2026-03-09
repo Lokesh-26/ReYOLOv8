@@ -94,6 +94,7 @@ resume: False
 
 speed: False
 zero_hidden: False
+freeze: 0  # freeze first N backbone layers (0=none)
 # Custom config.yaml ---------------------------------------------------------------------------------------------------
 cfg:  # for overriding defaults.yaml
 
