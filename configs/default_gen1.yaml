@@ -72,6 +72,7 @@ box: 10.87  # box loss gain — Optuna best
 cls: 3.31  # cls loss gain — Optuna best
 dfl: 1.24  # dfl loss gain — Optuna best
 tc: 0.0   # temporal consistency loss weight (0=disabled; use 0.1 to enable)
+cls_weight: False  # per-class inverse-AP BCE weighting (disabled by default)
 fl_gamma: 1.5  # focal loss gamma — penalises easy examples, focuses on hard classes
 nbs: 64  # nominal batch size
 invert: 0.0

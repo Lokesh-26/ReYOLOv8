@@ -120,6 +120,39 @@ class Loss:
         self.reg_max = m.reg_max
         self.device = device
 
+        # Per-class cls loss weights: upweight hard/rare classes.
+        # Derived from inverse mAP50 on MTevent val (640x480 C21 best.pt).
+        # Classes not in this dict default to weight 1.0.
+        # fmt: off
+        _per_class_map = {
+            0: 0.995,  # wooden_pallet
+            1: 0.060,  # small_klt
+            2: 0.219,  # big_klt
+            3: 0.226,  # blue_klt
+            4: 0.427,  # amazon_luggage
+            5: 0.113,  # ikea_dammang_bin
+            6: 0.728,  # ikea_vesken_trolley
+            7: 0.099,  # ikea_sortera_bin
+            8: 0.992,  # ikea_drona_grey
+            9: 0.979,  # ikea_drona_blue
+           10: 0.039,  # ikea_knallig_box
+           11: 0.995,  # ikea_moppe_drawer
+           12: 0.212,  # ikea_labbsal_basket
+           13: 0.994,  # ikea_ivar_box
+           14: 0.767,  # ikea_skubb_case
+           15: 0.302,  # ikea_samla_box
+           16: 0.969,  # human
+        }
+        # fmt: on
+        if getattr(h, 'cls_weight', False):
+            _weights = []
+            for c in range(self.nc):
+                ap = _per_class_map.get(c, 1.0)
+                _weights.append(min(max(1.0 / max(ap, 0.125), 1.0), 8.0))
+            self.cls_weight = torch.tensor(_weights, device=device, dtype=torch.float32)
+        else:
+            self.cls_weight = None
+
         self.use_dfl = m.reg_max > 1
         roll_out_thr = h.min_memory if h.min_memory > 1 else 64 if h.min_memory else 0  # 64 is default
 
@@ -187,7 +220,10 @@ class Loss:
 
         # cls loss
         # loss[1] = self.varifocal_loss(pred_scores, target_scores, target_labels) / target_scores_sum  # VFL way
-        loss[1] = self.bce(pred_scores, target_scores.to(dtype)).sum() / target_scores_sum  # BCE
+        if self.cls_weight is not None:
+            loss[1] = (self.bce(pred_scores, target_scores.to(dtype)) * self.cls_weight).sum() / target_scores_sum
+        else:
+            loss[1] = self.bce(pred_scores, target_scores.to(dtype)).sum() / target_scores_sum
 
         # bbox loss
         if fg_mask.sum():

@@ -30,8 +30,8 @@ CFG_INT_KEYS = {'batchs_init', 'val_epoch', 'channels', 'clip_length', 'clip_str
     'line_thickness', 'workspace', 'nbs', 'save_period', 'val_epoch', 'channels', 'freeze'}
 CFG_BOOL_KEYS = {
     'save', 'exist_ok', 'pretrained', 'verbose', 'deterministic','val', 'half', 'dnn', 'plots', 'show', 'save_txt', 'save_conf',
-    'save_crop', 'hide_labels', 'hide_conf', 'visualize', 'augment', 'boxes', 
-    'optimize', 'dynamic', 'rect', 'speed', 'zero_hidden'}
+    'save_crop', 'hide_labels', 'hide_conf', 'visualize', 'augment', 'boxes',
+    'optimize', 'dynamic', 'rect', 'speed', 'zero_hidden', 'cls_weight'}
 
 
 def cfg2dict(cfg):
