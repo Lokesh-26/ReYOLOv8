@@ -1,0 +1,24 @@
+path: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_stereo_5bin_320x256/images
+train: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_stereo_5bin_320x256/images/train
+val:   /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_stereo_5bin_320x256/images/val
+test:  /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_stereo_5bin_320x256/images/test
+
+nc: 17
+names:
+  - wooden_pallet          # 0  MR6D1
+  - small_klt              # 1  MR6D2
+  - big_klt                # 2  MR6D3
+  - blue_klt               # 3  MR6D4
+  - amazon_luggage         # 4  MR6D5
+  - ikea_dammang_bin       # 5  MR6D6
+  - ikea_vesken_trolley    # 6  MR6D7
+  - ikea_sortera_bin       # 7  MR6D8
+  - ikea_drona_grey        # 8  MR6D9
+  - ikea_drona_blue        # 9  MR6D10
+  - ikea_knallig_box       # 10 MR6D11
+  - ikea_moppe_drawer      # 11 MR6D12
+  - ikea_labbsal_basket    # 12 MR6D13
+  - ikea_ivar_box          # 13 MR6D14
+  - ikea_skubb_case        # 14 MR6D15
+  - ikea_samla_box         # 15 MR6D16
+  - human                  # 16

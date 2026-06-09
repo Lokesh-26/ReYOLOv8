@@ -60,9 +60,11 @@ def merge_h5(left_h5: Path, right_h5: Path, out_h5: Path):
                                    chunks=(1,) + shape_rest)
             CHUNK = 256
             for i in range(0, N_l, CHUNK):
-                ds[i:i+CHUNK] = left[i:i+CHUNK]
+                end = min(i + CHUNK, N_l)
+                ds[i:end] = left[i:end]
             for i in range(0, N_r, CHUNK):
-                ds[N_l+i:N_l+i+CHUNK] = right[i:i+CHUNK]
+                end = min(i + CHUNK, N_r)
+                ds[N_l+i:N_l+end] = right[i:end]
 
     print(f"  [OK] wrote {out_h5}  total={N_l+N_r} frames")
 
@@ -133,10 +135,10 @@ def merge_reyolo(root: Path):
     # Write dataset YAML
     yaml_path = root.parent / "configs" / "vtei_mtevent_combined.yaml"
     yaml_path.write_text(f"""\
-path: {out_root}/images
-train: {out_root}/images/train
-val:   {out_root}/images/val
-test:  {out_root}/images/test
+path: {out_root.resolve()}/images
+train: {out_root.resolve()}/images/train
+val:   {out_root.resolve()}/images/val
+test:  {out_root.resolve()}/images/test
 
 nc: 17
 names:

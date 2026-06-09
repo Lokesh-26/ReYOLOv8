@@ -96,6 +96,7 @@ resume: False
 speed: False
 zero_hidden: False
 freeze: 0  # freeze first N backbone layers (0=none)
+tc: 0.0  # temporal consistency loss weight (0=disabled)
 # Custom config.yaml ---------------------------------------------------------------------------------------------------
 cfg:  # for overriding defaults.yaml
 

@@ -24,7 +24,7 @@ CLI_HELP_MSG = \
     """
 CFG_FLOAT_KEYS = {'warmup_epochs', 'box', 'cls', 'dfl', 'max_zoom_out_factor', 'min_zoom_out_factor', 'fl_gamma'}
 CFG_FRACTION_KEYS = {'iou', 'lr0', 'lrf', 'momentum', 'weight_decay', 'warmup_momentum', 'warmup_bias_lr', 'conf', 'iou', 'zoom_out', 'invert',
-'positive', 'suppress', 'flip', 'invert' }
+'positive', 'suppress', 'flip', 'invert', 'tc' }
 CFG_INT_KEYS = {'batchs_init', 'val_epoch', 'channels', 'clip_length', 'clip_stride',
     'epochs', 'patience', 'batch', 'workers', 'seed','max_det',
     'line_thickness', 'workspace', 'nbs', 'save_period', 'val_epoch', 'channels', 'freeze'}
