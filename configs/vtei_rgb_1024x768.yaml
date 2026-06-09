@@ -1,7 +1,7 @@
-path: /tmp/rgb_yolo_test
-train: /tmp/rgb_yolo_test/images/train
-val:   /tmp/rgb_yolo_test/images/val
-test:  /tmp/rgb_yolo_test/images/test
+path: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_rgb_1024x768
+train: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_rgb_1024x768/images/train
+val:   /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_rgb_1024x768/images/val
+test:  /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_rgb_1024x768/images/test
 
 nc: 17
 names:

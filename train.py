@@ -20,6 +20,7 @@ from ultralytics.yolo.utils.checks import check_file, check_imgsz, print_args
 from ultralytics.yolo.utils.dist import ddp_cleanup, generate_ddp_command
 from ultralytics.yolo.utils.files import get_latest_run, increment_path
 from EventVideoDataloader import build_video_dataloader, build_video_val_standalone_dataloader
+from RGBImageDataset import RGBImageDataset
 from ultralytics.yolo.utils import LOGGER, colorstr
 from ultralytics.yolo.data.utils import  PIN_MEMORY, RANK
 from ultralytics.nn.tasks import DetectionModel2
@@ -37,6 +38,7 @@ import val
 from tqdm import tqdm
 from ultralytics.yolo.utils import (DEFAULT_CFG, LOGGER, RANK, SETTINGS, TQDM_BAR_FORMAT, __version__, callbacks,
                                     colorstr, emojis, yaml_save)
+import torch.nn.functional as F
 import torch.distributed as dist
 from torch.cuda import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -254,10 +256,24 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
         # calculate stride - check if model is initialized
         gs = max(int(de_parallel(self.model).stride.max() if self.model else 0), 32)
 
+        # If the data directory contains JPEG images, use the RGB dataset.
+        import glob as _glob
+        if _glob.glob(os.path.join(dataset_path, "*.jpg")):
+            from torch.utils.data import DataLoader
+            dataset = RGBImageDataset(dataset_path, self.video_config["clip_length"],
+                                      self.video_config["clip_stride"], self.video_config["channels"],
+                                      aug_param, load_type=mode)
+            sampler = None if rank == -1 else dist.DistributedSampler(dataset, shuffle=(mode == "train"))
+            nw = min(os.cpu_count() or 1, batch_size if batch_size > 1 else 0, self.args.workers)
+            return DataLoader(dataset, batch_size=min(batch_size, max(len(dataset), 1)),
+                              shuffle=(mode == "train" and sampler is None),
+                              num_workers=nw, sampler=sampler,
+                              pin_memory=PIN_MEMORY,
+                              collate_fn=RGBImageDataset.collate_fn)
 
         if mode == "train":
          return build_video_dataloader(self.args, self.video_config, batch_size,dataset_path, aug_param = self.aug_params,rank=rank, mode = mode, load = load)[0]
-        else: 
+        else:
 
            return build_video_val_standalone_dataloader(self.args, self.video_config, batch_size,dataset_path,rank, mode = load)[0]
 
@@ -293,7 +309,7 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
         return model
     
     def get_validator(self):
-        self.loss_names = 'box_loss', 'cls_loss', 'dfl_loss'
+        self.loss_names = 'box_loss', 'cls_loss', 'dfl_loss', 'tc_loss'
 
         return val.EventVideoDetectionValidator(self.video_config, self.test_loader,save_dir=self.save_dir,logger=self.console,args=copy(self.args))
 
@@ -589,6 +605,12 @@ class LossVideo:
         self.use_dfl = m.reg_max > 1
         roll_out_thr = h.min_memory if h.min_memory > 1 else 64 if h.min_memory else 0  # 64 is default
 
+        # Temporal consistency state — reset at T=0, populated at T>0
+        self.prev_pred_scores = None  # (b, anchors, nc) detached from previous timestep
+        self.prev_pred_bboxes = None  # (b, anchors, 4) detached from previous timestep
+        # tc=0 disables the loss (default); set tc>0 in config to enable
+        self.tc_weight = getattr(h, 'tc', 0.0)
+
         self.assigner = TaskAlignedAssigner(topk=10,
                                             num_classes=self.nc,
                                             alpha=0.5,
@@ -621,7 +643,7 @@ class LossVideo:
         return dist2bbox(pred_dist, anchor_points, xywh=False)
 
     def __call__(self, preds, batch, sequence_mask, cur_loss):
-        loss = torch.zeros(3, device=self.device)  # box, cls, dfl
+        loss = torch.zeros(4, device=self.device)  # box, cls, dfl, tc
         feats = preds[1] if isinstance(preds, tuple) else preds
 
 
@@ -668,9 +690,38 @@ class LossVideo:
         loss[0] *= self.hyp.box  # box gain
         loss[1] *= self.hyp.cls  # cls gain
         loss[2] *= self.hyp.dfl  # dfl gain
-        if cur_loss:
-           return loss.sum() * batch_size + cur_loss, loss.detach()  # loss(box, cls, dfl)
-        else: 
+
+        # Temporal consistency loss — penalise class/location jumps between consecutive frames.
+        # Resets at T=0 (cur_loss is None) so clips don't bleed into each other.
+        if cur_loss is None:
+            self.prev_pred_scores = None
+            self.prev_pred_bboxes = None
+
+        if self.tc_weight > 0 and self.prev_pred_scores is not None:
+            with torch.no_grad():
+                # Soft weight: focus penalty on anchors where either frame is confident.
+                # Background anchors (~conf≈0) contribute near-zero loss automatically.
+                w = torch.maximum(
+                    pred_scores.detach().sigmoid().amax(-1, keepdim=True),
+                    self.prev_pred_scores.sigmoid().amax(-1, keepdim=True),
+                )  # (b, anchors, 1)
+            # Class consistency: MSE on sigmoid probabilities
+            tc_cls = (F.mse_loss(pred_scores.sigmoid(),
+                                  self.prev_pred_scores.sigmoid(),
+                                  reduction='none') * w).mean()
+            # Box consistency: smooth L1 on decoded boxes (anchor grid units, scale-invariant)
+            tc_box = (F.smooth_l1_loss(pred_bboxes,
+                                        self.prev_pred_bboxes,
+                                        reduction='none', beta=1.0) * w).mean()
+            loss[3] = (tc_cls + 0.1 * tc_box) * self.tc_weight
+
+        # Store current frame predictions for the next timestep
+        self.prev_pred_scores = pred_scores.detach()
+        self.prev_pred_bboxes = pred_bboxes.detach()
+
+        if cur_loss is not None:
+           return loss.sum() * batch_size + cur_loss, loss.detach()  # loss(box, cls, dfl, tc)
+        else:
            return loss.sum() * batch_size, loss.detach()
 
 

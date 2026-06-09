@@ -29,12 +29,22 @@ from PIL import Image
 OUT_W, OUT_H = 1024, 768   # resize from 2048×1536
 
 
+RGB_TOPICS = ["/rgb/image_raw", "/camera/image_raw"]
+
+
 def extract_frames_from_bag(bag_path, out_dir):
-    """Extract /rgb/image_raw frames to out_dir as JPEG, named by timestamp_ns."""
+    """Extract RGB frames to out_dir as JPEG, named by timestamp_ns.
+    Tries /rgb/image_raw first, falls back to /camera/image_raw."""
     os.makedirs(out_dir, exist_ok=True)
     bag = rosbag.Bag(bag_path)
+    # Auto-detect which topic this bag uses
+    available = set(bag.get_type_and_topic_info().topics.keys())
+    topic = next((t for t in RGB_TOPICS if t in available), None)
+    if topic is None:
+        bag.close()
+        return 0
     count = 0
-    for _, msg, _ in bag.read_messages(topics=["/rgb/image_raw"]):
+    for _, msg, _ in bag.read_messages(topics=[topic]):
         h, w = msg.height, msg.width
         raw = np.frombuffer(msg.data, dtype=np.uint8).reshape(h, w, -1)
         # RGBA8 → RGB, then resize

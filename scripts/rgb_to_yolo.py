@@ -51,20 +51,20 @@ def read_jsonl(path):
 def nearest_label(labels, t_ns, max_dt_ns=None):
     if not labels:
         return None
-    if t_ns <= labels[0]["timestamp"]:
+    if t_ns <= int(labels[0]["timestamp"]):
         lab = labels[0]
-    elif t_ns >= labels[-1]["timestamp"]:
+    elif t_ns >= int(labels[-1]["timestamp"]):
         lab = labels[-1]
     else:
         lo, hi = 0, len(labels) - 1
         while lo <= hi:
             mid = (lo + hi) // 2
-            tm = labels[mid]["timestamp"]
+            tm = int(labels[mid]["timestamp"])
             if tm < t_ns: lo = mid + 1
             elif tm > t_ns: hi = mid - 1
             else: return labels[mid]
         cands = [labels[i] for i in (hi, lo) if 0 <= i < len(labels)]
-        lab = min(cands, key=lambda d: abs(d["timestamp"] - t_ns))
+        lab = min(cands, key=lambda d: abs(int(d["timestamp"]) - t_ns))
     if max_dt_ns and abs(int(lab["timestamp"]) - int(t_ns)) > max_dt_ns:
         return None
     return lab
