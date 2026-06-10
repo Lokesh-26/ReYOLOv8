@@ -59,17 +59,22 @@ def pad_to_multiple(tensor, multiple=32):
     return F.interpolate(tensor, size=(new_h, new_w), mode='bilinear', align_corners=False)
 
 
-def event_frame_to_bgr(frame_chw):
+def compute_global_scale(frames, clip_pct=95):
+    """Compute a fixed contrast scale from the 95th-percentile of nonzero magnitudes.
+    Sampled every 10 frames for speed. Returns scalar float."""
+    sample = np.abs(frames[::10].astype(np.float32))
+    nonzero = sample[sample > 0]
+    return float(np.percentile(nonzero, clip_pct)) if len(nonzero) else 1.0
+
+
+def event_frame_to_bgr(frame_chw, scale=1.0):
     """Convert (C, H, W) int8 voxel to red/blue polarity BGR image.
+    Uses a fixed global scale so contrast is consistent across frames.
     Positive net events → red, negative net events → blue, background black.
     """
-    acc = frame_chw.astype(np.float32).sum(axis=0)  # (H, W) summed across bins
-    pos = np.clip(acc, 0, None)
-    neg = np.clip(-acc, 0, None)
-    pos_max = pos.max()
-    neg_max = neg.max()
-    red  = (pos / pos_max * 255).astype(np.uint8) if pos_max > 0 else np.zeros_like(pos, dtype=np.uint8)
-    blue = (neg / neg_max * 255).astype(np.uint8) if neg_max > 0 else np.zeros_like(neg, dtype=np.uint8)
+    acc = frame_chw.astype(np.float32).sum(axis=0)  # (H, W)
+    red  = np.clip( acc / scale * 255, 0, 255).astype(np.uint8)
+    blue = np.clip(-acc / scale * 255, 0, 255).astype(np.uint8)
     bgr = np.zeros((*acc.shape, 3), dtype=np.uint8)
     bgr[:, :, 2] = red
     bgr[:, :, 0] = blue
@@ -136,6 +141,8 @@ def run(args):
     all_detections = []
     hidden = {"0": None, "1": None, "2": None, "3": None}
 
+    global_scale = compute_global_scale(frames)
+    print(f"[INFO] contrast scale (p95 of |nonzero|): {global_scale:.2f}")
     print(f"[INFO] running inference on {N} frames ...")
     with torch.no_grad():
         for t in range(N):
@@ -170,7 +177,7 @@ def run(args):
             all_detections.append(frame_record)
 
             # Render
-            bgr = event_frame_to_bgr(frame)
+            bgr = event_frame_to_bgr(frame, scale=global_scale)
             bgr = draw_detections(bgr, dets, orig_h, orig_w, pad_h, pad_w)
 
             cv2.imwrite(os.path.join(frames_dir, f"frame_{t:06d}.png"), bgr)
