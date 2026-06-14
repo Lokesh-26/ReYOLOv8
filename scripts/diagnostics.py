@@ -28,10 +28,11 @@ from ultralytics.yolo.utils import ops
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 MODELS = {
-    'C1':  'runs/train/mtevent_640x480_c1/weights/best.pt',
-    'C5':  'runs/train/mtevent_640x480_c5/weights/best.pt',
-    'C11': 'runs/train/mtevent_640x480_fixed_c11/weights/best.pt',
-    'C21': 'runs/train/mtevent_640x480_fixed_c21/weights/best.pt',
+    'C1':     'runs/train/mtevent_640x480_c1_clean/weights/best.pt',
+    'C5':     'runs/train/mtevent_640x480_c5_clean/weights/best.pt',
+    'C11':    'runs/train/mtevent_640x480_fixed_c11/weights/best.pt',
+    'C21':    'runs/train/mtevent_640x480_fixed_c21/weights/best.pt',
+    'C11_tc': 'runs/train/mtevent_640x480_tc_c11/weights/best.pt',
 }
 VAL_H5   = 'preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480/images/val/mtevent_val.h5'
 VAL_LBLS = 'preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480/labels/val'

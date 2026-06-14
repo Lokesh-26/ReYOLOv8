@@ -17,10 +17,11 @@ from collections import defaultdict
 
 # ── Config ────────────────────────────────────────────────────────────────────
 MODELS = {
-    'left_C1_best':  'runs/train/mtevent_640x480_c1/weights/best.pt',
-    'left_C5_best':  'runs/train/mtevent_640x480_c5/weights/best.pt',
+    'left_C1_best':  'runs/train/mtevent_640x480_c1_clean/weights/best.pt',
+    'left_C5_best':  'runs/train/mtevent_640x480_c5_clean/weights/best.pt',
     'left_C11_best': 'runs/train/mtevent_640x480_fixed_c11/weights/best.pt',
     'left_C21_best': 'runs/train/mtevent_640x480_fixed_c21/weights/best.pt',
+    'left_C11_tc':   'runs/train/mtevent_640x480_tc_c11/weights/best.pt',
 }
 VAL_H5   = 'preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480/images/val/mtevent_val.h5'
 VAL_LBLS = 'preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480/labels/val'

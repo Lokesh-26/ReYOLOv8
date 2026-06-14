@@ -1,6 +1,6 @@
 # Paper Plan: Recurrent Event-Based Object Detection for Industrial Environments
 
-**Last updated**: 2026-06-08 (full audit)
+**Last updated**: 2026-06-14 (clean temporal context study complete)
 **Target venue**: ICRA 2027 (deadline: Sep 15, 2027)
 **RAL viability**: requires a solid method contribution beyond baseline analysis
 
@@ -83,47 +83,43 @@ All current 640×480 runs use the corrected dataset.
 | mtevent_17cls_leftonly_c21 | 320×256 | C21 | 5 | left | gen1-pt | **0.2858** | 18 | weights/best.pt |
 | mtevent_17cls_combined_c212 | 320×256 | C21 | 5 | L+R | gen1-pt | **0.3067** | 24 | weights/best.pt |
 | mtevent_stereo_10ch_320x256_c11 | 320×256 | C11 | 10 | stereo | 640-ft* | **0.3166** | 60 | weights/best.pt |
+| mtevent_640x480_c1_clean | 640×480 | C1 | 5 | left | scratch | **0.4994** | — | weights/best.pt |
+| mtevent_640x480_c5_clean | 640×480 | C5 | 5 | left | scratch | **0.5145** | — | weights/best.pt |
 | mtevent_640x480_fixed_c11 | 640×480 | C11 | 5 | left | scratch | **0.5093** | 73 | weights/best.pt |
-| mtevent_stereo_10ch_640x480_c11_v22 | 640×480 | C11 | 10 | stereo | scratch | **0.5063** | 111 | weights/best.pt |
 | mtevent_640x480_fixed_c21 | 640×480 | C21 | 5 | left | scratch | **0.5274** | 107 | weights/best.pt |
+| mtevent_640x480_tc_c11 | 640×480 | C11 | 5 | left | scratch | **0.4706** | — | weights/best.pt |
+| mtevent_stereo_10ch_640x480_c11_v22 | 640×480 | C11 | 10 | stereo | scratch | **0.5063** | 111 | weights/best.pt |
 
 *stereo_320x256_c11 was initialized from the 640×480 stereo C11 best checkpoint — not a clean
 from-scratch or gen1-pretrained start.
 
-**Note on KLT ablation** (custom eval, all-points AP — absolute values lower than training eval):
-| Model | 17-class AP50* | 15-class AP50* | Gain |
-|-------|---------------|---------------|------|
-| mtevent_640x480_fixed_c21 | 0.4515 | 0.5084 | +0.057 |
-| mtevent_640x480_fixed_c11 | 0.4434 | 0.5044 | +0.061 |
-*From eval_merged_klt.py — uses different AP implementation than training eval.
-The absolute values are lower, but the gain (+0.057/+0.061) is valid for ablation comparison.
+**Note on cls_weight**: C1 and C5 were first trained with unconditional per-class inverse-AP BCE
+weighting hardcoded. Those runs (`mtevent_640x480_c1`, `mtevent_640x480_c5`) are invalid.
+The `_clean` reruns disable cls_weight (default off via flag). C11/C21 were not affected.
 
-### 5.2 Currently Running
+**Temporal context study — clean results** (sequential eval via eval_merged_klt.py):
 
-| Run directory | Res | Clip | Ch | Data | Tmux | PID | Epoch | Latest AP50 |
-|--------------|-----|------|----|------|------|-----|-------|-------------|
-| mtevent_640x480_clsw_c21 | 640×480 | C21 | 5 | left | post_640_queue | 996317 | 27/150 | 0.486 (ep25) |
-| mtevent_stereo_640x480_c21 | 640×480 | C21 | 10 | stereo | train_640_scratch | 995551 | 44/150 | 0.482 (ep26) |
+| Model | Training AP50 | KLT-eval 17-cls | KLT-eval 15-cls | Gain |
+|-------|--------------|----------------|----------------|------|
+| C1 clean | 0.4994 | 0.3639 | 0.4156 | +0.0517 |
+| C5 clean | 0.5145 | 0.4432 | 0.5022 | +0.0590 |
+| C11 | 0.5093 | 0.4434 | 0.5044 | +0.0610 |
+| C21 | 0.5274 | 0.4515 | 0.5084 | +0.0569 |
+| C11_tc | 0.4706 | 0.4618 | 0.5253 | +0.0635 |
 
-**CRITICAL NOTE on mtevent_640x480_clsw_c21**: This run has IDENTICAL hyperparameters to
-`mtevent_640x480_fixed_c21` (same fl_gamma=1.5, same cls=3.31, same model arch, same data).
-No per-class BCE weighting is implemented anywhere in train.py (commented out as TODO).
-This run is effectively a second training run of C21, useful for variance estimation but NOT
-a distinct class-weighting ablation.
+Training AP50 uses clip-batch validation (hidden state reset every clip); KLT-eval uses
+sequential frame-by-frame inference (hidden state carried through each scene). The TC model
+appears worst in training eval but best in sequential eval — see Section 11.7.
 
-**NOTE on mtevent_stereo_640x480_c21**: This is a NEW stereo C21 run, not previously documented
-in the memory. It uses stereo 640×480 data (10ch) and is showing improving mAP50 (0.581 at
-ep41, trending up). This was not mentioned in earlier session notes.
+### 5.2 Currently Running (as of 2026-06-08; verify before action)
 
-### 5.3 Never Started (despite claims in earlier session notes)
+| Run directory | Res | Clip | Ch | Data | Latest AP50 |
+|--------------|-----|------|----|------|-------------|
+| mtevent_640x480_clsw_c21 | 640×480 | C21 | 5 | left | 0.486 (ep25) |
+| mtevent_stereo_640x480_c21 | 640×480 | C21 | 10 | stereo | 0.482 (ep26) |
 
-| Planned run | Reason claimed | Actual status |
-|-------------|---------------|---------------|
-| mtevent_640x480_c1 | "already running" | No directory, no process — NOT STARTED |
-| mtevent_640x480_c5 | "already running" | No directory, no process — NOT STARTED |
-| mtevent_640x480_medium_c21 | "epoch 34/150" | No directory, never existed |
-
-These runs do not exist anywhere on disk. They must be launched after completing this audit.
+**Note on mtevent_640x480_clsw_c21**: IDENTICAL hyperparameters to `mtevent_640x480_fixed_c21`.
+Useful for variance estimation only; do NOT present as a class-weighting ablation.
 
 ### 5.4 Invalid / Failed
 
@@ -189,49 +185,26 @@ These runs do not exist anywhere on disk. They must be launched after completing
 
 ---
 
-## 7. Core Temporal-Context Study (640×480, left-only, ReYOLOv8s)
+## 7. Core Temporal-Context Study (640×480, left-only, ReYOLOv8s) — COMPLETE
 
-The central comparison requires four controlled runs varying only clip length:
+All four controlled runs are done. Fixed across comparison: architecture (ReYOLOv8s),
+initialization (from scratch), dataset (corrected 640×480 left-only), 5-channel 50ms voxel
+grid, optimizer (SGD, Optuna best params), batch=4, epochs=150.
 
-| Config | Clip | Stride | Status | Best AP50 | Run directory |
-|--------|------|--------|--------|-----------|---------------|
-| C1 | 1 | 1 | **NOT STARTED** | — | mtevent_640x480_c1 |
-| C5 | 5 | 3 | **NOT STARTED** | — | mtevent_640x480_c5 |
-| C11 | 11 | 5 | Complete ✓ | **0.5093** | mtevent_640x480_fixed_c11 |
-| C21 | 21 | 5 | Complete ✓ | **0.5274** | mtevent_640x480_fixed_c21 |
+| Config | Clip | Stride | Status | Training AP50 | KLT-eval 17cls | Run directory |
+|--------|------|--------|--------|--------------|----------------|---------------|
+| C1 | 1 | 1 | Complete ✓ | **0.4994** | 0.3639 | mtevent_640x480_c1_clean |
+| C5 | 5 | 3 | Complete ✓ | **0.5145** | 0.4432 | mtevent_640x480_c5_clean |
+| C11 | 11 | 5 | Complete ✓ | **0.5093** | 0.4434 | mtevent_640x480_fixed_c11 |
+| C21 | 21 | 5 | Complete ✓ | **0.5274** | 0.4515 | mtevent_640x480_fixed_c21 |
+| C11+TC | 11 | 5 | Complete ✓ | **0.4706** | 0.4618 | mtevent_640x480_tc_c11 |
 
-**Training commands for missing runs:**
+**Note on C1**: ConvLSTM hidden state is still present but limited to one frame of context per
+forward pass. Not a strictly non-recurrent model; it is the minimal-context lower bound.
 
-```bash
-# C1 — single-timestep baseline (minimal temporal context)
-WANDB_MODE=disabled /home/loki/anaconda3/envs/reyolov8/bin/python train.py \
-  --model ultralytics/models/v8/Recurrent/ReYOLOV8s.yaml \
-  --data configs/vtei_mtevent_640x480.yaml \
-  --hyp configs/default_gen1.yaml \
-  --device 0 --batch 4 --imgsz 640 --epochs 150 \
-  --channels 5 --clip_length 1 --clip_stride 1 --freeze 0 \
-  --name mtevent_640x480_c1
-
-# C5
-WANDB_MODE=disabled /home/loki/anaconda3/envs/reyolov8/bin/python train.py \
-  --model ultralytics/models/v8/Recurrent/ReYOLOV8s.yaml \
-  --data configs/vtei_mtevent_640x480.yaml \
-  --hyp configs/default_gen1.yaml \
-  --device 0 --batch 4 --imgsz 640 --epochs 150 \
-  --channels 5 --clip_length 5 --clip_stride 3 --freeze 0 \
-  --name mtevent_640x480_c5
-```
-
-**Fixed across comparison**: architecture (ReYOLOv8s), initialization (from scratch), dataset
-(corrected 640×480 left-only), 5-channel 50ms voxel grid, optimizer (SGD, Optuna best params),
-640×480 input, batch=4, epochs=150, seed=0.
-
-**Note on C1**: With clip_length=1, the model processes one timestep at a time. The ConvLSTM
-hidden state is still technically maintained across timesteps; C1 does not bypass the recurrent
-module but limits it to one frame of context per forward pass. It is a minimal-context baseline,
-not a strictly non-recurrent model.
-
-Do NOT launch another C1 or C5 if either run already exists or is running. Verify first.
+**Note on TC**: TC loss penalises frame-to-frame score/box inconsistency. Training mAP50 is
+worst (0.4706) because the training validator resets hidden state every clip and misses TC
+benefit. Sequential eval (KLT-eval) shows TC is best overall (0.4618 17cls / 0.5253 15cls).
 
 ---
 
@@ -241,23 +214,26 @@ Do NOT launch another C1 or C5 if either run already exists or is running. Verif
 
 | What | Why | Status |
 |------|-----|--------|
-| C1 at 640×480 | Lower bound for temporal context | NOT STARTED — must launch |
-| C5 at 640×480 | Intermediate point in context curve | NOT STARTED — must launch |
-| Unified evaluation of all 640×480 models | Consistent AP50/per-class metrics | Not done — evaluation pipeline needed |
+| Temporal context curve C1–C21 at 640×480 | Core result | **DONE** |
+| KLT ablation (17→15 class) | Colour-blindness penalty quantified | **DONE** |
+| Diagnostic analyses (A1–A5) | Failure mode decomposition | **DONE** |
+| Unified evaluation of all 640×480 models | Consistent AP50/per-class metrics | Not done — pipeline needed |
 | RVT re-evaluation at AP50 | Fair architecture comparison | Not done — requires eval script |
-| KLT ablation (run eval_merged_klt.py) | Verify/update 17→15 class results | Script ready, not re-run recently |
 
-### 8.2 Currently running (do not interrupt)
+### 8.2 Currently running (do not interrupt; verify before action)
 
-| What | Why | ETA |
+| What | Why | Status |
 |------|-----|-----|
-| mtevent_640x480_clsw_c21 | Second C21 run (variance estimate); functionally C21 repeat | ~100 more epochs |
-| mtevent_stereo_640x480_c21 | Stereo C21 at 640×480 | ~100 more epochs |
+| mtevent_640x480_clsw_c21 | Second C21 run (variance estimate) | Running |
+| mtevent_stereo_640x480_c21 | Stereo C21 at 640×480 | Running |
 
 ### 8.3 Complete — do not rerun
 
-- mtevent_640x480_fixed_c21 (C21, best AP50=0.5274)
+- mtevent_640x480_c1_clean (C1, best AP50=0.4994)
+- mtevent_640x480_c5_clean (C5, best AP50=0.5145)
 - mtevent_640x480_fixed_c11 (C11, best AP50=0.5093)
+- mtevent_640x480_fixed_c21 (C21, best AP50=0.5274)
+- mtevent_640x480_tc_c11 (C11+TC, best AP50=0.4706 training / 0.4618 sequential)
 - mtevent_stereo_10ch_640x480_c11_v22 (stereo C11, best AP50=0.5063)
 - mtevent_17cls_leftonly_c21 (C21 at 320×256, best AP50=0.2858)
 - mtevent_17cls_combined_c212 (C21 L+R at 320×256, best AP50=0.3067)
@@ -340,12 +316,18 @@ Output: printed to stdout — no JSON/CSV saved.
 
 ### Table 1 — Temporal context at 640×480 (core result)
 
-| Model | Clip | Stride | AP50 (val) | Δ vs C1 |
-|-------|------|--------|------------|---------|
-| ReYOLOv8s C1 | 1 | 1 | PENDING | baseline |
-| ReYOLOv8s C5 | 5 | 3 | PENDING | +? |
-| ReYOLOv8s C11 | 11 | 5 | 0.5093 | +? |
-| ReYOLOv8s C21 | 21 | 5 | 0.5274 | +? |
+Training AP50 (clip-batch val); KLT-eval AP50 (sequential, all-points interpolation).
+
+| Model | Clip | Stride | Training AP50 | KLT-eval 17cls | KLT-eval 15cls | Δ 17cls vs C1 |
+|-------|------|--------|--------------|----------------|----------------|--------------|
+| ReYOLOv8s C1 | 1 | 1 | 0.4994 | 0.3639 | 0.4156 | baseline |
+| ReYOLOv8s C5 | 5 | 3 | 0.5145 | 0.4432 | 0.5022 | +0.0793 |
+| ReYOLOv8s C11 | 11 | 5 | 0.5093 | 0.4434 | 0.5044 | +0.0795 |
+| ReYOLOv8s C21 | 21 | 5 | 0.5274 | 0.4515 | 0.5084 | +0.0876 |
+| ReYOLOv8s C11+TC | 11 | 5 | 0.4706 | 0.4618 | 0.5253 | +0.0979 |
+
+Key observation: saturation between C5 and C11 in training eval; TC loss uniquely benefits
+from sequential hidden-state carry (see Section 11.7).
 
 ### Table 2 — Resolution comparison (matched clip length)
 
@@ -370,11 +352,18 @@ controlled for initialization. Report this limitation.
 
 ### Table 4 — KLT ambiguity ablation
 
-| Model | 17-class AP50* | 15-class AP50* | Gain |
-|-------|---------------|---------------|------|
-| C21 640×480 | 0.4515 | 0.5084 | +0.057 |
-| C11 640×480 | 0.4434 | 0.5044 | +0.061 |
-*Custom AP evaluator; absolute values lower than training-time eval. The gain is valid.
+small_klt/big_klt/blue_klt merged into one 'klt' class. Custom AP evaluator (all-points);
+absolute values lower than training-time eval but gains are internally consistent.
+
+| Model | 17-class AP50 | 15-class AP50 | Gain |
+|-------|--------------|--------------|------|
+| C1 640×480 | 0.3639 | 0.4156 | +0.0517 |
+| C5 640×480 | 0.4432 | 0.5022 | +0.0590 |
+| C11 640×480 | 0.4434 | 0.5044 | +0.0610 |
+| C21 640×480 | 0.4515 | 0.5084 | +0.0569 |
+| C11+TC 640×480 | 0.4618 | 0.5253 | +0.0635 |
+
+The ~0.056–0.063 gain is stable across clip lengths, quantifying the colour-blindness penalty.
 
 ### Table 5 — Architecture comparison (requires unified evaluation)
 
@@ -389,7 +378,7 @@ as requiring unified re-evaluation.
 
 ### Figure 1 — AP50 vs Clip Length curve (C1/C5/C11/C21 at 640×480)
 
-Requires C1 and C5 results.
+Data available. Plot training AP50 and KLT-eval AP50 on same axes to show eval-protocol effect.
 
 ### Figure 2 — Per-class AP50 heatmap across clip lengths
 
@@ -400,6 +389,43 @@ Requires C1 and C5 results.
 ---
 
 ## 11. Analysis Plan (Without Additional Training)
+
+### 11.0 Diagnostic Analyses (completed 2026-06-14, script: scripts/diagnostics.py)
+
+Five analyses on C1/C5/C11/C21/C11_tc using sequential inference (hidden state carried through
+each scene). Results in `runs/diagnostics/`. Key findings:
+
+**A1 — Localization vs object displacement** (IoU of TP pairs binned by pixel displacement):
+- C1: degrades sharply 0.804 (0-2px) → 0.628 (20-40px). Fast-moving objects uncaught.
+- C5/C11/C21: flat (~0.879 → 0.834). Alignment saturates at C5; extra context doesn't help further.
+- Implication: C1→C5 gain is alignment, not scene understanding.
+
+**A2 — Recall vs event density** (GT instance recall binned by local density percentile):
+- Counterintuitive: recall is highest at LOW density (p0-10: ~0.84) and lowest at HIGH density
+  (p90-100: ~0.32–0.57). Large static objects (easy targets) dominate low-density bins.
+- TC partially helps at the highest-density bins vs C11 baseline.
+- Implication: density conditioning is not the bottleneck; class difficulty is.
+
+**A3 — FP persistence after object exit** (ghost detection):
+- Only 6–12 exit-proximity predictions tracked across all 4238 val frames.
+- Ghost detection is NOT a real problem in this dataset.
+- TC loss ghost-suppression motivation is empirically unsupported here.
+
+**A4 — AP by object size and clip length**:
+- Small objects (area <32²): AP=0.000 for ALL models. Hard resolution ceiling.
+- Medium objects drive C1→C5 gain. C11_tc has best medium AP (0.362 vs C11 0.334).
+- Large objects improve with clip but plateau at C11.
+- Implication: method effort on small objects is futile at this resolution.
+
+**A5 — Per-IoU AP vs clip length** (mAP at IoU thresholds 0.30–0.90):
+- C1: collapses at strict IoU (0.015 @0.90). Localization is poor.
+- C5–C21: maintain 0.283–0.308 @0.90. Recurrence substantially improves tight localization.
+- C11_tc is best at every IoU threshold: 0.467 @0.30 → 0.308 @0.90.
+- Implication: TC improves calibration AND localization, not just recall.
+
+**Notable per-class improvements with TC (vs C11)**:
+- ikea_samla_box: 0.065 → 0.353 (+5×)
+- ikea_vesken_trolley: 0.645 → 0.688
 
 ### 11.1 Temporal context
 When C1 and C5 are complete: compare C1→C5→C11→C21 AP50 curve. Identify saturation point.
@@ -419,6 +445,16 @@ Use cautious wording: "consistent with a colour-blindness penalty; other confoun
 Stereo C11 (0.5063) vs monocular C11 (0.5093): naive 10-channel concatenation shows no gain.
 Do not conclude stereo is ineffective — only that naive concatenation is not sufficient.
 Stereo C21 pending; compare when complete.
+
+### 11.7 Training eval vs sequential eval discrepancy (TC loss)
+Training mAP50 uses clip-batch evaluation: hidden state reset every `clip_length` frames.
+Sequential KLT eval carries hidden state through each full scene (as in deployment).
+TC loss trains for frame-to-frame consistency which only manifests when the hidden state is
+continuously propagated. Result: TC appears worst in training eval (0.4706) but best in
+sequential eval (0.4618 17cls, 0.5253 15cls).
+
+Paper angle: "standard clip-batch evaluation under-estimates TC benefit for recurrent event
+detectors evaluated sequentially." The evaluation protocol choice matters for recurrent models.
 
 ### 11.5 Data composition (320×256)
 L+R combined C21 (0.3067) vs left-only C21 (0.2858): +7.0% from doubling training data.
@@ -464,31 +500,25 @@ This run uses identical hyperparameters to fixed_c21. On completion:
 
 ## 13. Immediate Next Actions
 
+**Core experimental study is complete.** Temporal context curve C1→C21 + TC done.
+
 **Priority order**:
 
-1. **Launch C1 at 640×480** (GPU is occupied by two runs sharing a single GPU — wait for one
-   to finish before launching, or assess if batch=4 permits two concurrent runs).
-   Verify first that `runs/train/mtevent_640x480_c1/` does not exist.
+1. **Decide on paper angle**: benchmark+analysis (ICRA 2027) or method contribution (RAL).
+   Diagnostics show TC loss helps in sequential eval but training-eval score is misleading.
+   Whether TC is "novel enough" for RAL is a venue judgement, not a technical one.
 
-2. **Launch C5 at 640×480** — same constraint.
+2. **Write results section**: Table 1 (temporal context), Table 2 (resolution), Table 4 (KLT),
+   Figure 1 (AP50 vs clip length curve), Figure 2 (per-class heatmap), A1–A5 diagnostic plots.
 
-3. **Add CSV/JSON output to eval_merged_klt.py** to save per-class AP results.
+3. **Unified evaluation script**: write script for all 640×480 checkpoints using same protocol
+   as eval_merged_klt.py. Save to `runs/eval/unified_YYYYMMDD/`. Add C1_clean/C5_clean entries.
 
-4. **Write unified evaluation script** for all 640×480 checkpoints (AP50, per-class, confusion
-   matrix). Save outputs to `runs/eval/unified_640x480_YYYYMMDD/`.
+4. **Verify RVT AP50** using unified evaluator on `pu432wr0` and `jk20t51u` checkpoints.
 
-5. **Re-run eval_merged_klt.py** once C1 and C5 checkpoints exist, and update KLT ablation
-   table with those additional points.
+5. **When stereo C21 and clsw_c21 complete**: evaluate, add to stereo/variance tables.
 
-6. **Verify RVT AP50** by running a unified evaluator on `pu432wr0` and `jk20t51u` checkpoints.
-
-7. **When mtevent_stereo_640x480_c21 completes**: evaluate with unified script and add to
-   stereo comparison table.
-
-8. **When mtevent_640x480_clsw_c21 completes**: evaluate, confirm it matches fixed_c21
-   (same hyperparams), and decide how to present it in the paper (variance estimate).
-
-**After C1 and C5 complete**: assemble Table 1, Figure 1, and begin writing the results section.
+6. **Optional**: larger TC clip (C21+TC) if paper story benefits from it. Do not launch blindly.
 
 ---
 
@@ -506,12 +536,12 @@ This run uses identical hyperparameters to fixed_c21. On completion:
 
 ## 15. Open Questions
 
-1. **C1 result**: This is the most important pending number. Until C1 is evaluated, the resolution-
-   vs-recurrence decomposition cannot be quantified.
-2. **GPU scheduling**: With two runs occupying the GPU, when is the right time to launch C1/C5?
-   Both current runs are at epochs 27 and 44 of 150 — likely 1–2 days remaining each.
-3. **Venue strategy**: ICRA 2027 is feasible for a benchmark + analysis paper. RAL requires a
-   method contribution. Decide on venue before investing in method development.
-4. **Co-authors**: Not documented here. Who should be included?
-5. **RVT AP50 recovery**: Is there a fast path to re-evaluate the existing RVT checkpoints
+1. **Venue strategy**: ICRA 2027 is feasible for a benchmark + analysis paper. RAL requires a
+   method contribution. TC loss is a candidate but its evaluation-protocol discrepancy needs
+   to be the paper's core narrative, not just a footnote.
+2. **TC at C21**: Would C21+TC show stronger gain? Not yet run. Only launch if paper story needs it.
+3. **RVT AP50 recovery**: Is there a fast path to re-evaluate the existing RVT checkpoints
    using the ReYOLOv8 evaluator format?
+4. **Small object performance**: All models give 0.000 for small objects at 640×480. Is the
+   resolution ceiling a fundamental limit or a training issue? Higher res or multi-scale heads?
+5. **Co-authors**: Not documented here. Who should be included?
