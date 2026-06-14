@@ -1,0 +1,22 @@
+path: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480_15cls/images
+train: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480_15cls/images/train
+val:   /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480_15cls/images/val
+test:  /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_mtevent_50ms_5bin_640x480_15cls/images/test
+
+nc: 15
+names:
+  - wooden_pallet          # 0
+  - klt                    # 1  (merged: small_klt + big_klt + blue_klt)
+  - amazon_luggage         # 2
+  - ikea_dammang_bin       # 3
+  - ikea_vesken_trolley    # 4
+  - ikea_sortera_bin       # 5
+  - ikea_drona_grey        # 6
+  - ikea_drona_blue        # 7
+  - ikea_knallig_box       # 8
+  - ikea_moppe_drawer      # 9
+  - ikea_labbsal_basket    # 10
+  - ikea_ivar_box          # 11
+  - ikea_skubb_case        # 12
+  - ikea_samla_box         # 13
+  - human                  # 14
