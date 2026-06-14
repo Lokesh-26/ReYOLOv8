@@ -23,3 +23,9 @@ logs/
 optuna_reyolov8.db
 .Trash-1000/
 docs/
+
+# Private paper planning (not for public repo)
+PAPER_PLAN.md
+ICRA2026_poster*.pdf
+ICRA2026_poster*.pptx
+*.db
