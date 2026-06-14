@@ -25,7 +25,6 @@ optuna_reyolov8.db
 docs/
 
 # Private paper planning (not for public repo)
-PAPER_PLAN.md
 ICRA2026_poster*.pdf
 ICRA2026_poster*.pptx
 *.db
