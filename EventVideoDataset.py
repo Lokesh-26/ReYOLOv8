@@ -47,10 +47,16 @@ class EventVideoDetectionDataset(Dataset):
         # Load the information for each video and process it into clips
         begin = 0
 
+        # Stream-aware bookkeeping: h5 index of the first frame of every scene,
+        # and per-sample scene file (parallel to self.samples).
+        self.scene_start_frames = set()
+        self.sample_scene_file = []
+
         for i, f in enumerate(self.label_files):
             labels = np.load(f, allow_pickle = True)
             self.sequence_length.append(len(labels))
             length = len(labels)
+            self.scene_start_frames.add(begin)
              
             # padding is utilized to ensure clips of the same length
             labels = self.pad_labels(labels, length)
@@ -75,6 +81,7 @@ class EventVideoDetectionDataset(Dataset):
                         continue
 
                 self.samples.append(clip)
+                self.sample_scene_file.append(f)
              
     def pad_labels(self, labels, length):
 
@@ -197,7 +204,10 @@ class EventVideoDetectionDataset(Dataset):
         ret_dict['vid_file'] = img_file
         ret_dict['vid_pos'] = torch.from_numpy(np.array(flat_frame_ind))
         ret_dict['clip_pos'] = torch.from_numpy(np.array(frame))
-        ret_dict['batch_idx'] = torch.zeros(ret_dict['cls'].shape)        
+        ret_dict['batch_idx'] = torch.zeros(ret_dict['cls'].shape)
+        # True iff this window is the first window of a scene (stream-aware training
+        # resets the recurrent state for this batch slot). Collate keeps it as a tuple.
+        ret_dict['scene_start'] = bool(frame[0] in self.scene_start_frames)
 
         return ret_dict
              

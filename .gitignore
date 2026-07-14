@@ -28,3 +28,10 @@ docs/
 ICRA2026_poster*.pdf
 ICRA2026_poster*.pptx
 *.db
+
+# Runtime / results (not source)
+benchmark_results/
+run_pids/
+SESSION_HANDOFF_*.md
+*.pt
+!weights/*.pt

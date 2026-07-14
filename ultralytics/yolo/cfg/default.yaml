@@ -85,6 +85,7 @@ min_zoom_out_factor: 1.0
 ############ Video Settings
 clip_length: 11
 clip_stride: 5
+stream_aware: False  # carry detached hidden states across batches (RVT-style stream training)
 channels: 5
 #### Other settings
 rect: True

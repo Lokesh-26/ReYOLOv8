@@ -19,7 +19,7 @@ from ultralytics.yolo.data.utils import check_det_dataset
 from ultralytics.yolo.utils.checks import check_file, check_imgsz, print_args
 from ultralytics.yolo.utils.dist import ddp_cleanup, generate_ddp_command
 from ultralytics.yolo.utils.files import get_latest_run, increment_path
-from EventVideoDataloader import build_video_dataloader, build_video_val_standalone_dataloader
+from EventVideoDataloader import build_video_dataloader, build_video_val_standalone_dataloader, build_video_stream_dataloader
 from RGBImageDataset import RGBImageDataset
 from ultralytics.yolo.utils import LOGGER, colorstr
 from ultralytics.yolo.data.utils import  PIN_MEMORY, RANK
@@ -91,6 +91,10 @@ def parse_opt(known=False):
     # Video Hyperparameters
     parser.add_argument('--clip_length', type=int, default=11)
     parser.add_argument('--clip_stride', type=int, default=5)
+    parser.add_argument('--stream_aware', action='store_true',
+                        help='RVT-style stream training: carry detached hidden states across '
+                             'consecutive batches of the same scene; reset per-slot at scene '
+                             'starts. Forces clip_stride = clip_length for the train loader.')
     parser.add_argument('--channels',  type=int, default=1)  
     parser.add_argument('--val_epoch',  type=int, default=1)  
     # Augmentation Hyperparameters
@@ -139,6 +143,7 @@ if __name__ == '__main__':
 
     overrides["clip_length"] = args.clip_length
     overrides["clip_stride"] = args.clip_stride
+    overrides["stream_aware"] = args.stream_aware
     overrides["channels"] = args.channels
     overrides["patience"] = args.patience
 
@@ -272,6 +277,10 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
                               collate_fn=RGBImageDataset.collate_fn)
 
         if mode == "train":
+         if getattr(self.args, 'stream_aware', False):
+          return build_video_stream_dataloader(self.args, self.video_config, batch_size, dataset_path,
+                                               aug_param = self.aug_params, rank=rank,
+                                               seed=self.args.seed)[0]
          return build_video_dataloader(self.args, self.video_config, batch_size,dataset_path, aug_param = self.aug_params,rank=rank, mode = mode, load = load)[0]
         else:
 
@@ -312,6 +321,25 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
         self.loss_names = 'box_loss', 'cls_loss', 'dfl_loss', 'tc_loss'
 
         return val.EventVideoDetectionValidator(self.video_config, self.test_loader,save_dir=self.save_dir,logger=self.console,args=copy(self.args))
+
+    def _carry_stream_states(self, batch):
+        """Stream-aware training: return the detached hidden states carried from the
+        previous batch, zeroing the slots whose window begins a new scene. States are
+        [h, c] per ConvLSTM stage with batch dim == batch size (fixed by the sampler).
+        """
+        starts = batch['scene_start']  # tuple of B bools from collate
+        states = {}
+        for k, st in self._stream_hidden.items():
+            if st is None:
+                states[k] = None
+                continue
+            h, c = st
+            for b, is_start in enumerate(starts):
+                if is_start:
+                    h[b].zero_()
+                    c[b].zero_()
+            states[k] = [h, c]
+        return states
 
     def criterion(self, preds, batch, sequence_mask, cur_loss):
         if not hasattr(self, 'compute_loss'):
@@ -465,6 +493,11 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
 
             if rank != -1:
                 self.train_loader.sampler.set_epoch(epoch)
+            if getattr(self.args, 'stream_aware', False):
+                self.train_loader.batch_sampler.set_epoch(epoch)
+                # Fresh streams each epoch; every stream begins at a scene start,
+                # so starting from empty states is consistent.
+                self._stream_hidden = {"0": None, "1": None, "2": None, "3": None}
             pbar = enumerate(self.train_loader)
             
             if rank in {-1, 0}:
@@ -472,8 +505,11 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
                 pbar = tqdm(enumerate(self.train_loader), total=nb, bar_format=TQDM_BAR_FORMAT)
             self.tloss = None
 
-            for i, batch in pbar:        
-             hidden_states = {"0": None, "1": None, "2": None, "3": None}
+            for i, batch in pbar:
+             if getattr(self.args, 'stream_aware', False):
+                hidden_states = self._carry_stream_states(batch)
+             else:
+                hidden_states = {"0": None, "1": None, "2": None, "3": None}
              #self.loss = torch.zeros([], device=self.device)
              self.optimizer.zero_grad()
              for T in range(self.video_config["clip_length"]):
@@ -512,6 +548,12 @@ class EventVideoYOLOv8DetectionTrainer(BaseTrainer):
 
 
              self.scaler.scale(self.loss).backward()
+
+             if getattr(self.args, 'stream_aware', False):
+                # Truncated BPTT across windows: carry states forward, cut the graph.
+                self._stream_hidden = {
+                    k: ([v[0].detach(), v[1].detach()] if v is not None else None)
+                    for k, v in hidden_states.items()}
 
              # Optimizer Step only at the end of sequence
              # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html

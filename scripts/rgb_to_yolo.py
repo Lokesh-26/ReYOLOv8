@@ -80,6 +80,11 @@ def bbox_to_yolo(b, cls):
     cy = ((ymin + ymax) / 2) / orig_h
     w  = (xmax - xmin) / orig_w
     h  = (ymax - ymin) / orig_h
+    # Clamp to [0, 1] — some annotations extend slightly beyond image boundary
+    cx = max(0.0, min(1.0, cx))
+    cy = max(0.0, min(1.0, cy))
+    w  = max(0.0, min(1.0, w))
+    h  = max(0.0, min(1.0, h))
     if w <= 0 or h <= 0:
         return None
     return f"{cls} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}"

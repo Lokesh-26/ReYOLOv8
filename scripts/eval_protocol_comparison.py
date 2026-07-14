@@ -31,13 +31,16 @@ MODELS = {
     'C11_tc': ('runs/train/mtevent_640x480_tc_c11/weights/best.pt',    11),
 }
 
-# Training clip-batch AP50 from results.csv (read directly)
+# Training validator AP50 from results.csv (best.pt epoch, 101-point YOLO AP).
+# NOTE: These are NOT directly comparable to the all-points AP below.
+# Corrected 2026-06-17 — previous values (C1=0.4994, C5=0.5145, TC=0.4706)
+# were taken from intermediate epochs, not best.pt.
 TRAINING_MAP50 = {
-    'C1':     0.4994,
-    'C5':     0.5145,
-    'C11':    0.5093,
-    'C21':    0.5274,
-    'C11_tc': 0.4706,
+    'C1':     0.5403,  # best.pt ep 101, runs/train/mtevent_640x480_c1_clean/results.csv
+    'C5':     0.5114,  # best.pt ep 73,  runs/train/mtevent_640x480_c5_clean/results.csv
+    'C11':    0.5093,  # best.pt ep 73,  runs/train/mtevent_640x480_fixed_c11/results.csv
+    'C21':    0.5274,  # best.pt ep 107, runs/train/mtevent_640x480_fixed_c21/results.csv
+    'C11_tc': 0.5247,  # best.pt ep 147, runs/train/mtevent_640x480_tc_c11/results.csv
 }
 
 

@@ -26,7 +26,7 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 
-H, W = 256, 320
+H, W = None, None  # inferred from H5 data
 DT_US = 50_000  # 50 ms per frame in microseconds
 EV_REPR_NAME = 'stacked_histogram_dt=50_nbins=5'  # override with --ev_repr_name
 
@@ -53,7 +53,10 @@ def convert_split(src_root: Path, dst_root: Path, split: str):
     scene_files = sorted(label_dir.glob('scene_*.npy'), key=lambda p: scene_sort_key(p.name))
 
     with h5py.File(h5_path, 'r') as h5f:
-        all_frames = h5f['1mp'][:]  # (N_total, 5, 256, 320)
+        all_frames = h5f['1mp'][:]  # (N_total, C, H, W)
+
+    # Infer spatial dimensions and channel count from data
+    _, n_channels, frame_H, frame_W = all_frames.shape
 
     offset = 0
     for scene_path in tqdm(scene_files, desc=split):
@@ -61,7 +64,7 @@ def convert_split(src_root: Path, dst_root: Path, split: str):
         labels_raw = np.load(scene_path, allow_pickle=True)
         n_frames = len(labels_raw)
 
-        frames = all_frames[offset:offset + n_frames]  # (n_frames, 5, H, W)
+        frames = all_frames[offset:offset + n_frames]  # (n_frames, C, H, W)
         offset += n_frames
 
         out_dir = dst_root / split / scene_name
@@ -73,7 +76,7 @@ def convert_split(src_root: Path, dst_root: Path, split: str):
         # Write event representations H5
         repr_h5_path = repr_dir / 'event_representations.h5'
         with h5py.File(repr_h5_path, 'w') as f:
-            f.create_dataset('data', data=frames, chunks=(1, 5, H, W))
+            f.create_dataset('data', data=frames, chunks=(1, n_channels, frame_H, frame_W))
 
         # Fake timestamps: one per frame, 50 ms apart
         repr_timestamps = np.arange(n_frames, dtype=np.int64) * DT_US
@@ -95,10 +98,10 @@ def convert_split(src_root: Path, dst_root: Path, split: str):
 
             for box in frame_boxes:
                 class_id, cx_n, cy_n, w_n, h_n = float(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
-                x0 = (cx_n - w_n / 2) * W
-                y0 = (cy_n - h_n / 2) * H
-                w = w_n * W
-                h = h_n * H
+                x0 = (cx_n - w_n / 2) * frame_W
+                y0 = (cy_n - h_n / 2) * frame_H
+                w = w_n * frame_W
+                h = h_n * frame_H
                 all_boxes.append((t, x0, y0, w, h, int(class_id), 1.0))
 
         if len(all_boxes) == 0:

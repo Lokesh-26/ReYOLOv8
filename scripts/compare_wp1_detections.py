@@ -33,9 +33,10 @@ CLASS_NAMES = [
 ]
 
 MODELS = [
-    ('reyolo', 'detections/detections.json',         'ReYOLOv8',  '#e6194b'),
-    ('rvt',    'rvt_detections/rvt_detections.json',  'RVT-small', '#3cb44b'),
-    ('rgb',    'rgb_detections/rgb_detections.json',  'RGB YOLOv8','#4363d8'),
+    ('yolov8s', 'detections_yolov8s/detections.json',   'YOLOv8s',   '#f58231'),
+    ('tc',      'detections_tc_c11/detections.json',     'TC (C11)',   '#e6194b'),
+    ('rvt',     'rvt_detections/rvt_detections.json',    'RVT-small',  '#3cb44b'),
+    ('rgb',     'rgb_detections/rgb_detections.json',    'RGB YOLOv8', '#4363d8'),
 ]
 
 
