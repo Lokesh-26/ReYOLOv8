@@ -54,15 +54,19 @@ PALETTE = [
 ]
 
 
-def build_config_5ch_small():
-    """Manually build OmegaConf config for RVT-small 5ch mtevent model."""
+def build_config_5ch_small(channels=5, res_hw=(256, 320), dataset='mtevent', partition_split_32=1):
+    """Manually build OmegaConf config for RVT-small model.
+    channels=5 → 5ch signed VTEI @256x320 (default). channels=10, res_hw=(480,640)
+    → paper 640 model (split_pol interleaved). channels=20, res_hw=(240,304),
+    dataset='gen1', partition_split_32=2 → gen1 pretrained (nbins=10 grouped, 2 classes).
+    num_classes and partition_size are auto-derived by dynamically_modify_train_config."""
     cfg = OmegaConf.create({
         'dataset': {
-            'name': 'mtevent',
+            'name': dataset,
             'path': 'dummy',
             'ev_repr_name': 'stacked_histogram_dt=50_nbins=5',
             'sequence_length': 11,
-            'resolution_hw': [256, 320],
+            'resolution_hw': list(res_hw),
             'downsample_by_factor_2': False,
             'only_load_end_labels': False,
             'train': {'sampling': 'mixed', 'random': {'weighted_sampling': False},
@@ -80,8 +84,8 @@ def build_config_5ch_small():
             'name': 'rnndet',
             'backbone': {
                 'name': 'MaxViTRNN',
-                'input_channels': 5,
-                'partition_split_32': 1,
+                'input_channels': channels,
+                'partition_split_32': partition_split_32,
                 'embed_dim': 48,
                 'dim_multiplier': [1, 2, 4, 8],
                 'num_blocks': [1, 1, 1, 1],
@@ -146,11 +150,24 @@ def compute_global_scale(frames, clip_pct=95):
     return float(np.percentile(nonzero, clip_pct)) if len(nonzero) else 1.0
 
 
-def event_frame_to_bgr(frame_chw, scale=1.0):
-    acc = frame_chw.astype(np.float32).sum(axis=0)
-    red  = np.clip( acc / scale * 255, 0, 255).astype(np.uint8)
-    blue = np.clip(-acc / scale * 255, 0, 255).astype(np.uint8)
-    bgr = np.zeros((*acc.shape, 3), dtype=np.uint8)
+def event_frame_to_bgr(frame_chw, scale=1.0, layout="signed"):
+    """Red = positive polarity, blue = negative. Stacked histograms are all-positive
+    counts, so split the polarity channels before differencing (else it's all red).
+      interleaved (10ch mtevent-640): even ch = pos, odd = neg
+      grouped     (20ch gen1):        first half = neg, second half = pos
+      signed      (5ch VTEI):         net accumulation, split by sign"""
+    f = frame_chw.astype(np.float32)
+    if layout == "interleaved":
+        pos, neg = f[0::2].sum(0), f[1::2].sum(0)
+    elif layout == "grouped":
+        h = f.shape[0] // 2
+        neg, pos = f[:h].sum(0), f[h:].sum(0)
+    else:
+        acc = f.sum(0)
+        pos, neg = np.clip(acc, 0, None), np.clip(-acc, 0, None)
+    red  = np.clip(pos / scale * 255, 0, 255).astype(np.uint8)
+    blue = np.clip(neg / scale * 255, 0, 255).astype(np.uint8)
+    bgr = np.zeros((*red.shape, 3), dtype=np.uint8)
     bgr[:, :, 2] = red
     bgr[:, :, 0] = blue
     return bgr
@@ -183,7 +200,21 @@ def run(args):
     N, C, orig_h, orig_w = frames.shape
     print(f"[INFO] frames shape: {frames.shape}  ({N} frames, {C}ch, {orig_h}×{orig_w})")
 
-    cfg = build_config_5ch_small()
+    if args.dataset in ("gen1", "gen4"):
+        global CLASS_NAMES
+        # gen1: (car, pedestrian).  gen4/1Mpx: (pedestrian, two wheeler, car) -- note the
+        # different index for person.  See RVT utils/evaluation/prophesee/visualize/vis_utils.py.
+        CLASS_NAMES = ["car", "pedestrian"] if args.dataset == "gen1" else \
+                      ["pedestrian", "two wheeler", "car"]
+    if args.polarity == "auto":
+        layout = "grouped" if args.dataset in ("gen1", "gen4") else \
+                 ("interleaved" if C == 10 else ("grouped" if C == 20 else "signed"))
+    else:
+        layout = args.polarity
+    print(f"[INFO] polarity render layout: {layout}")
+
+    cfg = build_config_5ch_small(channels=C, res_hw=(args.height, args.width),
+                                 dataset=args.dataset, partition_split_32=args.partition_split)
     in_res_hw = tuple(cfg.model.backbone.in_res_hw)
     assert C == cfg.model.backbone.input_channels, \
         f"H5 has {C} channels but model expects {cfg.model.backbone.input_channels}"
@@ -260,7 +291,7 @@ def run(args):
                     ])
             all_detections.append(frame_record)
 
-            bgr = event_frame_to_bgr(frame, scale=global_scale)
+            bgr = event_frame_to_bgr(frame, scale=global_scale, layout=layout)
             if dets_np is not None:
                 dets_draw = dets_np.copy()
                 if need_resize:
@@ -298,6 +329,14 @@ def main():
     ap.add_argument('--device',  default='cuda:0')
     ap.add_argument('--conf',    type=float, default=0.25)
     ap.add_argument('--iou',     type=float, default=0.45)
+    ap.add_argument('--dataset', default='mtevent', choices=['mtevent', 'gen1', 'gen4'],
+                    help="gen1 → 2 classes (car,pedestrian); gen4 → 3 (pedestrian,two wheeler,car)")
+    ap.add_argument('--partition_split', type=int, default=1, help='gen1 uses 2')
+    ap.add_argument('--polarity', default='auto',
+                    choices=['auto', 'signed', 'interleaved', 'grouped'],
+                    help='render layout for red(+)/blue(-); auto by dataset/channels')
+    ap.add_argument('--height',  type=int, default=256, help='model input H (640 model: 480)')
+    ap.add_argument('--width',   type=int, default=320, help='model input W (640 model: 640)')
     args = ap.parse_args()
     run(args)
 

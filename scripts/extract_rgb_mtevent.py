@@ -95,11 +95,22 @@ def copy_rgb_annotations_from_zip(zf, dst_dir):
     return copied
 
 
+def pick_combined_bag(names):
+    """The combined (RGB-carrying) bag is usually all.bag, but a few scenes name it
+    scene<N>.bag. Anything but the per-camera event bags counts; largest wins."""
+    cands = [n for n in names
+             if n.endswith(".bag") and os.path.basename(n) not in ("left.bag", "right.bag")]
+    for n in cands:
+        if os.path.basename(n) == "all.bag":
+            return n
+    return cands[0] if cands else None
+
+
 def process_scene_dir(scene_dir, out_scene_dir):
     """Process an already-unzipped scene directory."""
-    bag_path = os.path.join(scene_dir, "all.bag")
-    if not os.path.isfile(bag_path):
-        print(f"  [WARN] no all.bag found at {bag_path}, skipping")
+    bag_path = pick_combined_bag(glob.glob(os.path.join(scene_dir, "*.bag")))
+    if bag_path is None or not os.path.isfile(bag_path):
+        print(f"  [WARN] no combined bag found in {scene_dir}, skipping")
         return False
     rgb_out = os.path.join(out_scene_dir, "rgb")
     n = extract_frames_from_bag(bag_path, rgb_out)
@@ -118,11 +129,12 @@ def process_scene_zip(zip_path, out_scene_dir, tmp_dir):
         with zipfile.ZipFile(zip_path, "r") as zf:
             copied = copy_rgb_annotations_from_zip(zf, out_scene_dir)
             # 2. Extract all.bag to tmp
-            all_bag_entry = next((n for n in zf.namelist() if os.path.basename(n) == "all.bag"), None)
+            all_bag_entry = pick_combined_bag([n for n in zf.namelist() if n.count("/") <= 1])
             if all_bag_entry is None:
-                print(f"  [WARN] no all.bag in {zip_path}, skipping")
+                print(f"  [WARN] no combined bag in {zip_path}, skipping")
                 return False
-            print(f"  extracting all.bag ({zf.getinfo(all_bag_entry).file_size // 1024 // 1024} MB) ...")
+            print(f"  extracting {os.path.basename(all_bag_entry)} "
+                  f"({zf.getinfo(all_bag_entry).file_size // 1024 // 1024} MB) ...")
             with zf.open(all_bag_entry) as src, open(tmp_bag, "wb") as dst:
                 shutil.copyfileobj(src, dst)
 

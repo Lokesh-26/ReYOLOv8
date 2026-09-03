@@ -1,0 +1,26 @@
+# RGB YOLO dataset on split v2 (leakage-free, pallet held out in val+test).
+# Scene assignment: configs/mtevent_split_v2.json -- identical scenes to the event models.
+path: /home/loki/event/ReYOLOv8/preprocessed_datasets/vtei_rgb_1024x768
+train: /home/loki/event/ReYOLOv8/configs/rgb_v2_train.txt
+val:   /home/loki/event/ReYOLOv8/configs/rgb_v2_val.txt
+test:  /home/loki/event/ReYOLOv8/configs/rgb_v2_test.txt
+
+nc: 17
+names:
+  - wooden_pallet
+  - small_klt
+  - big_klt
+  - blue_klt
+  - amazon_luggage
+  - ikea_dammang_bin
+  - ikea_vesken_trolley
+  - ikea_sortera_bin
+  - ikea_drona_grey
+  - ikea_drona_blue
+  - ikea_knallig_box
+  - ikea_moppe_drawer
+  - ikea_labbsal_basket
+  - ikea_ivar_box
+  - ikea_skubb_case
+  - ikea_samla_box
+  - human

@@ -42,12 +42,16 @@ def load_model(weights_path, device):
     return model
 
 
-def infer_frame(model, img_bgr, device, conf_thr, iou_thr):
+def infer_frame(model, img_bgr, device, conf_thr, iou_thr, imgsz=640):
     """Run YOLOv8 on a BGR image; returns (boxes_xyxy, scores, class_ids) as numpy arrays."""
     from ultralytics.yolo.utils import ops
     H, W = img_bgr.shape[:2]
-    # Resize to 640×640 (standard YOLOv8 input size), keep aspect ratio via letterbox-style pad
-    scale = 640 / max(H, W)
+    # BGR -> RGB. cv2.imread gives BGR; the model was trained on RGB. Omitting this fed
+    # channel-swapped images for the whole 2026 benchmark: pallet AP collapsed 0.313 -> 0.052
+    # (a colour/texture class) while person barely moved (shape-dominated). Do not remove.
+    img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    # Resize longest side to imgsz (match training imgsz), keep aspect ratio via letterbox-style pad
+    scale = imgsz / max(H, W)
     new_h, new_w = int(round(H * scale)), int(round(W * scale))
     resized = cv2.resize(img_bgr, (new_w, new_h))
     # Pad to 640×640
@@ -82,6 +86,8 @@ def run(args):
                     glob.glob(os.path.join(args.frames_dir, "*.png")))
     if not frames:
         raise RuntimeError(f"No frames found in {args.frames_dir}")
+    if args.max_frames:
+        frames = frames[:args.max_frames]
     print(f"[INFO] {len(frames)} frames  weights={args.weights}")
 
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
@@ -96,8 +102,8 @@ def run(args):
 
     all_detections = []
     for t, fpath in enumerate(frames):
-        img = cv2.imread(fpath)
-        boxes, scores, cls_ids = infer_frame(model, img, device, args.conf, args.iou)
+        img = cv2.imread(fpath)          # BGR, for drawing; infer_frame converts internally
+        boxes, scores, cls_ids = infer_frame(model, img, device, args.conf, args.iou, args.imgsz)
 
         frame_record = {"frame": t, "boxes": []}
         for (x1,y1,x2,y2), conf, cls_id in zip(boxes, scores, cls_ids):
@@ -133,8 +139,13 @@ if __name__ == "__main__":
     ap.add_argument("--frames_dir", required=True)
     ap.add_argument("--weights",    required=True)
     ap.add_argument("--out_dir",    required=True)
+    # 640 = the imgsz every rgb_640_*.pt checkpoint was trained at. Inferring at a different
+    # imgsz changes the object pixel scale the weights learned; the 768 default this replaced
+    # was a train/test mismatch. Pass --imgsz explicitly for a checkpoint trained elsewise.
+    ap.add_argument("--imgsz", type=int,   default=640)
     ap.add_argument("--conf",  type=float, default=0.25)
     ap.add_argument("--iou",   type=float, default=0.45)
-    ap.add_argument("--fps",   type=float, default=20.0)
+    ap.add_argument("--fps",   type=float, default=25.0)
+    ap.add_argument("--max_frames", type=int, default=0, help="0 = all frames")
     ap.add_argument("--device", default="cuda:0")
     run(ap.parse_args())
